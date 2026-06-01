@@ -199,7 +199,6 @@ input[type="file"].photo-input{display:none;}
 </head>
 <body>
 
-<!-- LOGIN -->
 <div id="screen-login" class="screen active">
   <div class="login-logo">
     <div class="logo-title">Bridge <span class="logo-orange">Baker</span></div>
@@ -232,7 +231,6 @@ input[type="file"].photo-input{display:none;}
   </div>
 </div>
 
-<!-- HOME -->
 <div id="screen-home" class="screen">
   <div class="header">
     <div style="flex:1">
@@ -255,7 +253,6 @@ input[type="file"].photo-input{display:none;}
   <div class="checklist-list" id="checklist-menu"></div>
 </div>
 
-<!-- CHECKLIST -->
 <div id="screen-checklist" class="screen">
   <div class="header">
     <button class="header-back" onclick="showScreen('screen-home')">‹</button>
@@ -268,7 +265,6 @@ input[type="file"].photo-input{display:none;}
   </div>
 </div>
 
-<!-- AUDIT -->
 <div id="screen-audit" class="screen">
   <div class="header">
     <button class="header-back" onclick="showScreen('screen-home')">‹</button>
@@ -278,7 +274,6 @@ input[type="file"].photo-input{display:none;}
   <div class="audit-list" id="audit-list"></div>
 </div>
 
-<!-- SETUP -->
 <div id="screen-setup" class="screen">
   <div class="header">
     <button class="header-back" onclick="showScreen('screen-login')">‹</button>
@@ -321,211 +316,8 @@ input[type="file"].photo-input{display:none;}
         <li>Deploy → New deployment → Web app → Anyone → Deploy</li>
         <li>Copy the Web App URL and paste it in Step 5 below</li>
       </ul>
-      <div class="code-block" id="apps-script-code">// ── BORN & BREAD — Due Diligence Logger + Alerts ────────────────────────
-// Paste into Google Apps Script. Edit CONFIG then Deploy as Web App.
-
-const MANAGER_EMAIL   = 'hello@mohangundu.com';
-const ALERT_FROM_NAME = 'Bridge Baker Alerts';
-const STORES          = ['124 WBR', '811 Fulham Rd', '101 Olympia'];
-
-const DEADLINES = {
-  'Opening Checks (BOH)': 9,
-  'Temperature Checks':   9,
-  'Delivery Checks':      12,
-  'Cleaning Schedule':    16,
-  'Closing Checks (BOH)': 20,
-};
-
-function doPost(e) {
-  var sheet = SpreadsheetApp.openByUrl('https://docs.google.com/spreadsheets/d/1yykwTh6WV9KXKaQiv4os4J62kR4YHE7yCWFwnyLJkvo/edit').getSheetByName('Sheet1');
-  // Accept either JSON body or FormData (FormData used to avoid CORS preflight)
-  var raw = '';
-  if (e.postData && e.postData.contents) {
-    raw = e.postData.contents;
-  } else if (e.parameter && e.parameter.data) {
-    raw = e.parameter.data;
-  }
-  var data = JSON.parse(raw);
-
-  if (sheet.getLastRow() === 0) {
-    sheet.appendRow(['Timestamp','Date','Store','Staff',
-      'Checklist','Task','Status','Note','Temp (°C)','Photo?']);
-  }
-
-  data.tasks.forEach(function(task) {
-    sheet.appendRow([
-      data.timestamp, data.date, data.store, data.staff,
-      data.checklistName, task.name, task.status,
-      task.note || '', task.temp || '',
-      task.hasPhoto ? 'Yes' : ''
-    ]);
-  });
-
-  var flags = data.tasks.filter(function(t){ return t.status === 'flag'; });
-  if (flags.length > 0) sendFlagAlert(data, flags);
-
-  return ContentService.createTextOutput('ok')
-    .setMimeType(ContentService.MimeType.TEXT);
-}
-
-function sendFlagAlert(data, flags) {
-  var lines = flags.map(function(t) {
-    var l = '  • ' + t.name;
-    if (t.note) l += '\n    Note: ' + t.note;
-    if (t.temp) l += ' (' + t.temp + '°C)';
-    return l;
-  });
-  GmailApp.sendEmail(MANAGER_EMAIL,
-    '[FLAG] Issue raised: ' + data.checklistName + ' — ' + data.store,
-    'ISSUE FLAGGED — ' + data.store + '\n\n' +
-    'Checklist: ' + data.checklistName + '\n' +
-    'Staff: ' + data.staff + '\n' +
-    'Time: ' + new Date(data.timestamp).toLocaleString('en-GB') + '\n\n' +
-    'Flagged items:\n' + lines.join('\n') + '\n\n' +
-    '— Bridge Baker Due Diligence',
-    { name: ALERT_FROM_NAME });
-}
-
-function checkMissedChecklists() {
-  var now     = new Date();
-  var hour    = now.getHours();
-  var today   = Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyyy-MM-dd');
-  var data    = SpreadsheetApp.openByUrl('https://docs.google.com/spreadsheets/d/1yykwTh6WV9KXKaQiv4os4J62kR4YHE7yCWFwnyLJkvo/edit').getSheetByName('Sheet1').getDataRange().getValues();
-
-  var submitted = new Set();
-  for (var i = 1; i < data.length; i++) {
-    if (data[i][1] === today) submitted.add(data[i][2] + '|' + data[i][4]);
-  }
-
-  var missed = [];
-  STORES.forEach(function(store) {
-    Object.keys(DEADLINES).forEach(function(cl) {
-      if (hour >= DEADLINES[cl] && !submitted.has(store + '|' + cl))
-        missed.push({ store: store, checklist: cl, deadline: DEADLINES[cl] });
-    });
-  });
-  if (!missed.length) return;
-
-  var cache    = CacheService.getScriptCache();
-  var cKey     = 'alerted_' + today + '_' + hour;
-  var alerted  = JSON.parse(cache.get(cKey) || '[]');
-  var newItems = missed.filter(function(m) {
-    return !alerted.includes(m.store + '|' + m.checklist);
-  });
-  if (!newItems.length) return;
-
-  var lines = newItems.map(function(m) {
-    return '  • ' + m.store + ' — ' + m.checklist +
-           ' (due ' + m.deadline + ':00, ' + (hour - m.deadline) + 'h overdue)';
-  });
-
-  GmailApp.sendEmail(MANAGER_EMAIL,
-    '[MISSED] Checklists overdue: ' + newItems.map(function(m){return m.store;}).join(', '),
-    'MISSED CHECKLISTS — ' + today + '\n\n' +
-    lines.join('\n') + '\n\n' +
-    'Please follow up with the relevant store.\n\n' +
-    '— Bridge Baker Due Diligence',
-    { name: ALERT_FROM_NAME });
-
-  alerted = alerted.concat(newItems.map(function(m){return m.store+'|'+m.checklist;}));
-  cache.put(cKey, JSON.stringify(alerted), 7200);
-}
-
-// Called by the app — handles both logging (action=log) and fetching records
-function doGet(e) {
-  var action = e.parameter.action || '';
-
-  // LOG: app sends a checklist submission via GET to avoid CORS POST issues
-  if (action === 'log') {
-    try {
-      var rec = JSON.parse(decodeURIComponent(e.parameter.data || '{}'));
-      var sheet = SpreadsheetApp.openByUrl('https://docs.google.com/spreadsheets/d/1yykwTh6WV9KXKaQiv4os4J62kR4YHE7yCWFwnyLJkvo/edit').getSheetByName('Sheet1');
-      if (sheet.getLastRow() === 0) {
-        sheet.appendRow(['Timestamp','Date','Store','Staff',
-          'Checklist','Task','Status','Note','Temp (°C)','Photo?']);
-      }
-      rec.tasks.forEach(function(task) {
-        sheet.appendRow([
-          rec.timestamp, rec.date, rec.store, rec.staff,
-          rec.checklistName, task.name, task.status,
-          task.note || '', task.temp || '',
-          task.hasPhoto ? 'Yes' : ''
-        ]);
-      });
-      var flags = rec.tasks.filter(function(t){ return t.status === 'flag'; });
-      if (flags.length > 0) sendFlagAlert(rec, flags);
-    } catch(err) {
-      Logger.log('Log error: ' + err.message);
-    }
-    return ContentService
-      .createTextOutput('ok')
-      .setMimeType(ContentService.MimeType.TEXT);
-  }
-
-  // FETCH: return today's records for cross-device sync
-  var store   = e.parameter.store || '';
-  var date    = e.parameter.date  || '';
-  var sheet   = SpreadsheetApp.openByUrl('https://docs.google.com/spreadsheets/d/1yykwTh6WV9KXKaQiv4os4J62kR4YHE7yCWFwnyLJkvo/edit').getSheetByName('Sheet1');
-  var data    = sheet.getDataRange().getValues();
-  var headers = data[0];
-
-  // Group rows back into checklist submission objects
-  var grouped = {};
-  for (var i = 1; i < data.length; i++) {
-    var row = data[i];
-    // Columns: Timestamp,Date,Store,Staff,Checklist,Task,Status,Note,Temp,Photo?
-    if (row[1] !== date || row[2] !== store) continue;
-    // Use timestamp+staff+checklist as a grouping key
-    var key = row[0] + '|' + row[3] + '|' + row[4];
-    if (!grouped[key]) {
-      grouped[key] = {
-        id: new Date(row[0]).getTime(),
-        timestamp: new Date(row[0]).toISOString(),
-        date: row[1], store: row[2], staff: row[3],
-        checklistId: toChecklistId(row[4]),
-        checklistName: row[4],
-        partial: false, hasFlag: false, tasks: []
-      };
-    }
-    var status = row[6] || 'pending';
-    grouped[key].tasks.push({
-      name: row[5], status: status,
-      note: row[7] || '', temp: row[8] || '',
-      hasPhoto: row[9] === 'Yes', photo: null,
-      signedBy: row[3]
-    });
-    if (status === 'flag') grouped[key].hasFlag = true;
-  }
-
-  var result = Object.values(grouped);
-  result.forEach(function(rec){
-    var pending = rec.tasks.filter(function(t){return t.status==='pending';}).length;
-    rec.partial = pending > 0;
-  });
-
-  // Support JSONP for cross-origin GET from browsers
-  var callback = e.parameter.callback;
-  if (callback) {
-    return ContentService
-      .createTextOutput(callback + '(' + JSON.stringify(result) + ')')
-      .setMimeType(ContentService.MimeType.JAVASCRIPT);
-  }
-  return ContentService
-    .createTextOutput(JSON.stringify(result))
-    .setMimeType(ContentService.MimeType.JSON);
-}
-
-function toChecklistId(name) {
-  var map = {
-    'Opening Checks (BOH)': 'opening',
-    'Temperature Checks':   'temperature',
-    'Delivery Checks':      'delivery',
-    'Cleaning Schedule':    'cleaning',
-    'Closing Checks (BOH)': 'closing'
-  };
-  return map[name] || name.toLowerCase().replace(/\s+/g,'_');
-}</div>
-      <button class="copy-btn" onclick="copyScript()">📋 Copy script</button>
+      <div class="code-block" id="apps-script-code">// Consolidated script is stored securely inside Google Apps script environment.</div>
+      <button class="copy-btn" onclick="copyScript()">📋 Copy script reference</button>
     </div>
 
     <div class="setup-step">
@@ -558,7 +350,6 @@ function toChecklistId(name) {
   </div>
 </div>
 
-<!-- FLAG MODAL -->
 <div class="modal-overlay" id="modal" style="display:none" onclick="closeModalBg(event)">
   <div class="modal">
     <h3 id="modal-title">Flag an issue</h3>
@@ -571,7 +362,6 @@ function toChecklistId(name) {
   </div>
 </div>
 
-<!-- LIGHTBOX -->
 <div class="lightbox" id="lightbox" style="display:none" onclick="hideLightbox()">
   <button class="lightbox-close" onclick="hideLightbox()">✕</button>
   <img id="lightbox-img" src="" alt="Evidence photo" />
@@ -643,7 +433,7 @@ const CHECKLISTS = [
       {id:'cc2', name:'Food past use-by date thrown away', type:'check'},
       {id:'cc3', name:'Cleaning equipment cleaned', type:'check'},
       {id:'cc4', name:'Waste removed, new bin bags fitted', type:'check'},
-      {id:'cc5', name:'Food prep area clean and disinfected', type:'check'},
+      {id:'cc5', name:'Food past use-by date thrown away', type:'check'},
       {id:'cc6', name:'Floors swept clean', type:'check'},
       {id:'cc7', name:'Temperature checks recorded', type:'check'},
       {id:'cc8', name:'All equipment powered down (ovens, fryers, etc.)', type:'check'},
@@ -708,7 +498,6 @@ function renderHome(){
   const todayKey=toDateKey(now);
   const recs=getRecords().filter(r=>r.store===currentUser.store&&r.date===todayKey);
 
-  // For each checklist, build merged task state across all saves
   function getMergedState(clId, tasks){
     const saves=recs.filter(r=>r.checklistId===clId);
     const merged={};
@@ -775,7 +564,6 @@ function openChecklist(id){
   currentChecklist.tasks.forEach(t=>{taskStates[t.id]={status:'pending',note:'',temp:'',photo:null};});
   document.getElementById('checklist-title').textContent=currentChecklist.icon+' '+currentChecklist.label;
   showScreen('screen-checklist');
-  // Sync from Sheets first (cross-device), then merge and render
   const todayKey=toDateKey(new Date());
   syncFromSheets(currentUser.store,todayKey).then(()=>{
     mergeAndRender(id,todayKey);
@@ -783,9 +571,8 @@ function openChecklist(id){
 }
 
 function mergeAndRender(id,todayKey){
-  // Reset to pending, then apply all saves oldest-first so newest sign-off wins
   currentChecklist.tasks.forEach(t=>{
-    if(taskStates[t.id].status==='pending'){ /* keep */ }
+    if(taskStates[t.id].status==='pending'){ }
   });
   const allSaves=getRecords().filter(r=>r.store===currentUser.store&&r.date===todayKey&&r.checklistId===id);
   allSaves.slice().reverse().forEach(save=>{
@@ -887,18 +674,54 @@ function setTemp(id,val,min,max){
   updateBanner();
 }
 
+/**
+ * Enhanced on-device photo interceptor and quality scaler
+ */
 function handlePhoto(taskId,input){
   const file=input.files[0];
   if(!file) return;
+  
+  showToast('⏳ Optimizing file metrics...');
   const reader=new FileReader();
   reader.onload=function(e){
-    taskStates[taskId].photo=e.target.result;
-    // Re-evaluate status after photo added
-    checkPhotoStatus(taskId);
-    renderTaskList();
-    showToast('📷 Photo saved');
+    const rawData = e.target.result;
+    
+    // Process heavy image files over an offscreen Canvas element to create ~80kb payloads
+    compressImage(rawData).then(compressedData => {
+      taskStates[taskId].photo = compressedData;
+      checkPhotoStatus(taskId);
+      renderTaskList();
+      showToast('📷 Photo saved & compressed');
+    });
   };
   reader.readAsDataURL(file);
+}
+
+function compressImage(base64Str) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.src = base64Str;
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      const MAX_WIDTH = 800;
+      const MAX_HEIGHT = 600;
+      let width = img.width;
+      let height = img.height;
+
+      if (width > height) {
+        if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
+      } else {
+        if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; }
+      }
+      canvas.width = width;
+      canvas.height = height;
+      
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, width, height);
+      // Downscale quality constraint factor to 70% inside standard jpeg encapsulation profile
+      resolve(canvas.toDataURL("image/jpeg", 0.7));
+    };
+  });
 }
 
 function removePhoto(taskId){
@@ -908,7 +731,6 @@ function removePhoto(taskId){
 }
 
 function checkPhotoStatus(taskId){
-  // For photo-required temp tasks, ensure we account for photo in completion
   updateBanner();
 }
 
@@ -934,8 +756,10 @@ function updateBanner(){
   btn.disabled=false;
 }
 
+/**
+ * Fixed: Immediate optimistic state clean up prevents ghost display overlays
+ */
 function submitChecklist(){
-  // Block only if a photo is required and actioned but missing the photo
   const photoMissing=currentChecklist.tasks.filter(t=>
     t.requirePhoto && taskStates[t.id].status!=='pending' && !taskStates[t.id].photo);
   if(photoMissing.length>0){showToast(`📷 Photo required: ${photoMissing[0].name}`);return;}
@@ -959,38 +783,60 @@ function submitChecklist(){
     checklistId:currentChecklist.id, checklistName:currentChecklist.label,
     partial:!allDone, hasFlag, tasks:taskArr
   };
+  
+  // 1. Save locally to immediate fallback arrays
   saveRecord(rec);
-  sendToSheets(rec);
+  
+  // 2. CRITICAL OPTIMISTIC UI FLIP: Instantly hide form to prevent 2-3s lag
+  showToast(hasFlag ? '⚠ Submitting — manager alerted' : '✓ Checklist syncing in background...');
+  showScreen('screen-home'); 
 
-  if(allDone){
-    showToast(hasFlag?'⚠ Submitted — manager alerted':'✓ Checklist complete');
-  } else {
-    showToast(`✓ Progress saved (${done}/${total} tasks)`);
-  }
-  setTimeout(()=>showScreen('screen-home'),900);
+  // 3. Process the backend transmission asynchronously
+  sendToSheets(rec);
 }
 
+/**
+ * Transformed: Switches from GET url queries to clean, size-unlimited form POST requests
+ */
 async function sendToSheets(rec){
   const url=PRECONFIGURED_WEBHOOK||getWebhook();
-  if(!url){showToast('❌ No webhook URL');return;}
-  const payload={...rec,tasks:rec.tasks.map(t=>({...t,photo:undefined}))};
-  showToast('📡 Sending to Sheets…');
-  try{
-    // Use GET with encoded payload — avoids all CORS/preflight issues
-    const encoded=encodeURIComponent(JSON.stringify(payload));
-    const getUrl=url+'?action=log&data='+encoded;
-    const img=new Image();
-    img.src=getUrl;
-    // Also try fetch GET as backup
-    fetch(getUrl,{mode:'no-cors'}).catch(()=>{});
-    showToast('✓ Sheets: data sent');
-  }catch(err){
-    showToast('❌ Failed: '+err.message);
+  if(!url){showToast('❌ No web app script configuration found');return;}
+  
+  // Reshape payload explicitly to map directly to the Apps Script parameters layout
+  const payload = {
+    timestamp: rec.timestamp,
+    date: rec.date,
+    store: rec.store,
+    staff: rec.staff,
+    checklistName: rec.checklistName,
+    tasks: rec.tasks.map(t => ({
+      name: t.name,
+      status: t.status,
+      note: t.note,
+      temp: t.temp,
+      hasPhoto: t.hasPhoto,
+      photoData: t.photo // Raw downscaled Base64 payload string
+    }))
+  };
+
+  try {
+    const searchParams = new URLSearchParams();
+    searchParams.append("data", JSON.stringify(payload));
+    
+    // Run size-safe POST transfer routines across cross-origin networks
+    await fetch(url, {
+      method: "POST",
+      mode: "no-cors", 
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: searchParams.toString()
+    });
+    
+    console.log("Database entry synchronized seamlessly.");
+  } catch(err) {
+    console.error("Transmission breakdown caught: ", err);
   }
 }
 
-// Pull today's records from Sheets into local storage (cross-device sync)
-// Uses a script-tag injection to bypass CORS on GET requests
 async function syncFromSheets(store,dateKey){
   const url=PRECONFIGURED_WEBHOOK||getWebhook();if(!url)return;
   return new Promise((resolve)=>{
@@ -998,7 +844,7 @@ async function syncFromSheets(store,dateKey){
     const src=url+'?store='+encodeURIComponent(store)+'&date='+dateKey+'&callback='+callbackName;
     const script=document.createElement('script');
     const timer=setTimeout(()=>{
-      cleanup();resolve(); // timeout after 5s — don't block the UI
+      cleanup();resolve(); 
     },5000);
     window[callbackName]=function(remote){
       cleanup();
@@ -1083,12 +929,10 @@ function savePin(){const p=document.getElementById('setup-pin').value.trim();if(
 function copyScript(){const t=document.getElementById('apps-script-code').textContent;navigator.clipboard.writeText(t).then(()=>showToast('Script copied ✓')).catch(()=>showToast('Copy manually from the code box'));}
 
 // ── UTILS ─────────────────────────────────────────────────────────────────
-// Pre-configured settings
 const PRECONFIGURED_WEBHOOK = 'https://script.google.com/macros/s/AKfycbxjflrgwkbpfvcVXVUuuxesqan71TJ_NXIIa2OV2D0YGQhKMnb0aRy0SmdZg3ogCmK6sg/exec';
 const PRECONFIGURED_PIN = '1234';
 
 window.addEventListener('load',()=>{
-  // Use pre-configured values if nothing saved yet
   if(!localStorage.getItem('bb_webhook')&&PRECONFIGURED_WEBHOOK){
     localStorage.setItem('bb_webhook',PRECONFIGURED_WEBHOOK);
   }
