@@ -418,7 +418,7 @@ const CHECKLISTS = [
       {id:'cl1', name:'Coffee machine backflush &amp; steam arm wiped', type:'check'},
       {id:'cl2', name:'Countertops and displays wiped down', type:'check'},
       {id:'cl3', name:'Floors swept and mopped (kitchen + FOH)', type:'check'},
-      {id:'cl4', name:'Bins emptied and relined', type:'check'},
+      {id:'cl4', name:'Bins emptied and relined', type(--bins);'check'},
       {id:'cl5', name:'Toilet + handwash areas checked &amp; restocked', type:'check'},
       {id:'cl6', name:'All chopping boards sanitised', type:'check'},
       {id:'cl7', name:'Grease traps checked', type:'check'},
@@ -457,11 +457,21 @@ function getWebhook(){return localStorage.getItem('bb_webhook')||'';}
 function getPin(){return localStorage.getItem('bb_pin')||'';}
 
 // ── NAV ───────────────────────────────────────────────────────────────────
+/**
+ * Upgrade: Automatically run silent backend sync whenever home screen mounts 
+ * to load changes processed by different shift colleagues in real-time.
+ */
 function showScreen(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   window.scrollTo(0,0);
-  if(id==='screen-home') renderHome();
+  if(id==='screen-home') {
+    renderHome();
+    const todayKey=toDateKey(new Date());
+    syncFromSheets(currentUser.store,todayKey).then(()=>{
+      renderHome(); // Re-render instantly when background rows arrive
+    });
+  }
   if(id==='screen-audit') renderAudit();
 }
 function goAudit(){
@@ -564,7 +574,7 @@ function openChecklist(id){
   currentChecklist.tasks.forEach(t=>{taskStates[t.id]={status:'pending',note:'',temp:'',photo:null};});
   document.getElementById('checklist-title').textContent=currentChecklist.icon+' '+currentChecklist.label;
   
-  // THE FIX: Wipe out the old checklist text instantly so it doesn't "ghost" while loading
+  // Wipe out old view context instantly to avoid 2-3s ghost lag during processing
   document.getElementById('task-list').innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);font-weight:500;">⏳ Syncing latest logs...</div>';
   
   showScreen('screen-checklist');
@@ -612,9 +622,11 @@ function renderTaskList(){
       const v=s.temp,n=parseFloat(v);
       const inR=v!==''&&n>=task.min&&n<=task.max;
       const outR=v!==''&&!inR;
+      
+      // Upgrade: Removed inputmode="decimal" to allow the keyboard negative sign layout to appear
       tempHtml=`<div class="temp-row">
         <input class="temp-input" type="number" value="${v}" placeholder="0"
-          oninput="setTemp('${task.id}',this.value,${task.min},${task.max})" step="0.1" inputmode="decimal"/>
+          oninput="setTemp('${task.id}',this.value,${task.min},${task.max})" step="0.1" />
         <span class="temp-unit">°C</span>
         <span class="temp-range">Range: ${task.min} to ${task.max}°C</span>
         <span class="temp-status ${inR?'ok':outR?'bad':''}" id="ts_${task.id}">${inR?'✓ OK':outR?'✗ Out of range':''}</span>
@@ -678,9 +690,6 @@ function setTemp(id,val,min,max){
   updateBanner();
 }
 
-/**
- * Enhanced on-device photo interceptor and quality scaler
- */
 function handlePhoto(taskId,input){
   const file=input.files[0];
   if(!file) return;
@@ -689,8 +698,6 @@ function handlePhoto(taskId,input){
   const reader=new FileReader();
   reader.onload=function(e){
     const rawData = e.target.result;
-    
-    // Process heavy image files over an offscreen Canvas element to create ~80kb payloads
     compressImage(rawData).then(compressedData => {
       taskStates[taskId].photo = compressedData;
       checkPhotoStatus(taskId);
@@ -722,7 +729,6 @@ function compressImage(base64Str) {
       
       const ctx = canvas.getContext("2d");
       ctx.drawImage(img, 0, 0, width, height);
-      // Downscale quality constraint factor to 70% inside standard jpeg encapsulation profile
       resolve(canvas.toDataURL("image/jpeg", 0.7));
     };
   });
@@ -760,9 +766,6 @@ function updateBanner(){
   btn.disabled=false;
 }
 
-/**
- * Fixed: Immediate optimistic state clean up prevents ghost display overlays
- */
 function submitChecklist(){
   const photoMissing=currentChecklist.tasks.filter(t=>
     t.requirePhoto && taskStates[t.id].status!=='pending' && !taskStates[t.id].photo);
@@ -788,25 +791,16 @@ function submitChecklist(){
     partial:!allDone, hasFlag, tasks:taskArr
   };
   
-  // 1. Save locally to immediate fallback arrays
   saveRecord(rec);
-  
-  // 2. CRITICAL OPTIMISTIC UI FLIP: Instantly hide form to prevent 2-3s lag
   showToast(hasFlag ? '⚠ Submitting — manager alerted' : '✓ Checklist syncing in background...');
   showScreen('screen-home'); 
-
-  // 3. Process the backend transmission asynchronously
   sendToSheets(rec);
 }
 
-/**
- * Transformed: Switches from GET url queries to clean, size-unlimited form POST requests
- */
 async function sendToSheets(rec){
   const url=PRECONFIGURED_WEBHOOK||getWebhook();
   if(!url){showToast('❌ No web app script configuration found');return;}
   
-  // Reshape payload explicitly to map directly to the Apps Script parameters layout
   const payload = {
     timestamp: rec.timestamp,
     date: rec.date,
@@ -819,7 +813,7 @@ async function sendToSheets(rec){
       note: t.note,
       temp: t.temp,
       hasPhoto: t.hasPhoto,
-      photoData: t.photo // Raw downscaled Base64 payload string
+      photoData: t.photo 
     }))
   };
 
@@ -827,7 +821,6 @@ async function sendToSheets(rec){
     const searchParams = new URLSearchParams();
     searchParams.append("data", JSON.stringify(payload));
     
-    // Run size-safe POST transfer routines across cross-origin networks
     await fetch(url, {
       method: "POST",
       mode: "no-cors", 
@@ -903,11 +896,12 @@ function renderAudit(){
     const time=dt.toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
     const flagCount=rec.tasks.filter(t=>t.status==='flag').length;
     const taskRows=rec.tasks.map(t=>{
-      const icon=t.status==='ok'?'✓':t.status==='flag'?'⚠':'–';
-      const col=t.status==='ok'?'var(--ok)':t.status==='flag'?'var(--danger)':'var(--text-muted)';
+      // Upgrade: Swapped the plain grey hyphen (-) out for an explicit red (✗) to call out skipped line metrics
+      const icon=t.status==='ok'?'✓':t.status==='flag'?'⚠':'✗';
+      const col=t.status==='ok'?'var(--ok)':'var(--danger)';
       const photoThumb=t.photo?`<img class="audit-photo-thumb" src="${t.photo}" alt="photo" onclick="showLightboxSrc('${t.photo}')" />`:'';
       return `<div class="audit-task-row">
-        <span style="flex:1"><span style="color:${col};margin-right:6px">${icon}</span>${t.name}${t.temp?` (${t.temp}°C)`:''}</span>
+        <span style="flex:1"><span style="color:${col};margin-right:6px;font-weight:bold;">${icon}</span>${t.name}${t.temp?` (${t.temp}°C)`:''}</span>
         ${t.note?`<span class="flag-note">${t.note}</span>`:''}
       </div>${photoThumb?`<div style="padding:2px 0 6px 22px">${photoThumb}</div>`:''}`;
     }).join('');
@@ -933,7 +927,7 @@ function savePin(){const p=document.getElementById('setup-pin').value.trim();if(
 function copyScript(){const t=document.getElementById('apps-script-code').textContent;navigator.clipboard.writeText(t).then(()=>showToast('Script copied ✓')).catch(()=>showToast('Copy manually from the code box'));}
 
 // ── UTILS ─────────────────────────────────────────────────────────────────
-const PRECONFIGURED_WEBHOOK = 'https://script.google.com/macros/s/AKfycbw3RkJWeXJzWDeTbhpOLG0IBYYtk7iFubS0lNb3kLAjp_7NyyzaR1dKAYmkCgTsOIHJog/exec';
+const PRECONFIGURED_WEBHOOK = 'https://script.google.com/macros/s/AKfycbxjflrgwkbpfvcVXVUuuxesqan71TJ_NXIIa2OV2D0YGQhKMnb0aRy0SmdZg3ogCmK6sg/exec';
 const PRECONFIGURED_PIN = '1234';
 
 window.addEventListener('load',()=>{
