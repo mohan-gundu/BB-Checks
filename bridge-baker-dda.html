@@ -418,7 +418,7 @@ const CHECKLISTS = [
       {id:'cl1', name:'Coffee machine backflush &amp; steam arm wiped', type:'check'},
       {id:'cl2', name:'Countertops and displays wiped down', type:'check'},
       {id:'cl3', name:'Floors swept and mopped (kitchen + FOH)', type:'check'},
-      {id:'cl4', name:'Bins emptied and relined', type(--bins);'check'},
+      {id:'cl4', name:'Bins emptied and relined', type:'check'},
       {id:'cl5', name:'Toilet + handwash areas checked &amp; restocked', type:'check'},
       {id:'cl6', name:'All chopping boards sanitised', type:'check'},
       {id:'cl7', name:'Grease traps checked', type:'check'},
@@ -457,10 +457,6 @@ function getWebhook(){return localStorage.getItem('bb_webhook')||'';}
 function getPin(){return localStorage.getItem('bb_pin')||'';}
 
 // ── NAV ───────────────────────────────────────────────────────────────────
-/**
- * Upgrade: Automatically run silent backend sync whenever home screen mounts 
- * to load changes processed by different shift colleagues in real-time.
- */
 function showScreen(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
@@ -469,7 +465,7 @@ function showScreen(id){
     renderHome();
     const todayKey=toDateKey(new Date());
     syncFromSheets(currentUser.store,todayKey).then(()=>{
-      renderHome(); // Re-render instantly when background rows arrive
+      renderHome(); 
     });
   }
   if(id==='screen-audit') renderAudit();
@@ -574,7 +570,6 @@ function openChecklist(id){
   currentChecklist.tasks.forEach(t=>{taskStates[t.id]={status:'pending',note:'',temp:'',photo:null};});
   document.getElementById('checklist-title').textContent=currentChecklist.icon+' '+currentChecklist.label;
   
-  // Wipe out old view context instantly to avoid 2-3s ghost lag during processing
   document.getElementById('task-list').innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);font-weight:500;">⏳ Syncing latest logs...</div>';
   
   showScreen('screen-checklist');
@@ -623,7 +618,6 @@ function renderTaskList(){
       const inR=v!==''&&n>=task.min&&n<=task.max;
       const outR=v!==''&&!inR;
       
-      // Upgrade: Removed inputmode="decimal" to allow the keyboard negative sign layout to appear
       tempHtml=`<div class="temp-row">
         <input class="temp-input" type="number" value="${v}" placeholder="0"
           oninput="setTemp('${task.id}',this.value,${task.min},${task.max})" step="0.1" />
@@ -896,7 +890,6 @@ function renderAudit(){
     const time=dt.toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
     const flagCount=rec.tasks.filter(t=>t.status==='flag').length;
     const taskRows=rec.tasks.map(t=>{
-      // Upgrade: Swapped the plain grey hyphen (-) out for an explicit red (✗) to call out skipped line metrics
       const icon=t.status==='ok'?'✓':t.status==='flag'?'⚠':'✗';
       const col=t.status==='ok'?'var(--ok)':'var(--danger)';
       const photoThumb=t.photo?`<img class="audit-photo-thumb" src="${t.photo}" alt="photo" onclick="showLightboxSrc('${t.photo}')" />`:'';
