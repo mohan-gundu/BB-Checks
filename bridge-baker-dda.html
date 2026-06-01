@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Bridge Baker">
+<meta name="theme-color" content="#5a5242">
+<title>Bridge Baker — Daily Checks</title>
+<style>
+:root {
+  --orange:      #ff8038;
+  --orange-light:#fff0e6;
+  --orange-dark: #cc5a1a;
+  --brown:       #5a5242;
+  --brown-light: #f5f3f0;
+  --grey:        #dbd5cd;
+  --grey-light:  #f7f5f3;
+  --grey-dark:   #9e9890;
+  --text:        #2a2520;
+  --text-muted:  #7a7468;
+  --border:      #dbd5cd;
+  --surface:     #ffffff;
+  --ok:          #3a8c5c;
+  --ok-light:    #eaf5ee;
+  --danger:      #c0392b;
+  --danger-light:#fdecea;
+  --warning:     #e67e22;
+  --warning-light:#fef6ee;
+  --radius:      10px;
+  --radius-lg:   14px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--grey-light);color:var(--text);min-height:100vh;font-size:15px;}
+.screen{display:none;min-height:100vh;flex-direction:column;}
+.screen.active{display:flex;}
+
+/* HEADER */
+.header{background:var(--brown);color:white;padding:14px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:100;}
+.header-back{background:none;border:none;color:white;font-size:24px;cursor:pointer;padding:0 4px 0 0;line-height:1;}
+.header h1{font-size:17px;font-weight:600;flex:1;letter-spacing:-0.2px;}
+.header-sub{font-size:11px;opacity:0.7;display:block;font-weight:400;margin-top:1px;}
+.header-btn{background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);color:white;padding:6px 12px;border-radius:7px;font-size:13px;cursor:pointer;font-weight:500;}
+.header-btn.accent{background:var(--orange);border-color:var(--orange-dark);}
+.header-btn:active{opacity:0.8;}
+
+/* LOGIN */
+#screen-login{background:var(--brown);justify-content:center;align-items:center;padding:28px 20px;}
+.login-logo{text-align:center;color:white;margin-bottom:36px;}
+.login-logo .logo-title{font-size:26px;font-weight:700;letter-spacing:-0.5px;line-height:1.1;}
+.login-logo .logo-orange{color:var(--orange);}
+.login-logo .logo-sub{font-size:13px;opacity:0.65;margin-top:6px;letter-spacing:0.5px;text-transform:uppercase;}
+.login-card{background:var(--surface);border-radius:var(--radius-lg);padding:24px;width:100%;max-width:360px;box-shadow:0 4px 24px rgba(0,0,0,0.18);}
+.login-card h2{font-size:15px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:18px;}
+.field{margin-bottom:14px;}
+.field label{display:block;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px;}
+.field select,.field input{width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:15px;color:var(--text);background:var(--surface);appearance:none;-webkit-appearance:none;transition:border-color 0.15s;}
+.field select:focus,.field input:focus{outline:none;border-color:var(--orange);}
+.field select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%239e9890' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:38px;}
+.btn{width:100%;padding:13px;border:none;border-radius:9px;font-size:15px;font-weight:600;cursor:pointer;transition:opacity 0.15s,transform 0.1s;letter-spacing:-0.1px;}
+.btn:active{opacity:0.85;transform:scale(0.99);}
+.btn-primary{background:var(--orange);color:white;}
+.btn-brown{background:var(--brown);color:white;margin-top:10px;}
+.btn-ghost{background:var(--grey-light);color:var(--text);border:1.5px solid var(--border);margin-top:8px;}
+.btn-danger{background:var(--danger);color:white;}
+
+/* HOME */
+.home-greeting{padding:16px 16px 0;}
+.home-greeting p{font-size:13px;color:var(--text-muted);}
+.home-greeting strong{color:var(--text);}
+.date-badge{display:inline-block;background:var(--orange-light);color:var(--orange-dark);padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;margin-top:6px;letter-spacing:0.2px;}
+.section-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--text-muted);padding:18px 16px 8px;}
+.status-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:0 16px;}
+.stat-card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:12px 8px;text-align:center;}
+.stat-num{font-size:24px;font-weight:700;}
+.stat-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-top:3px;}
+.stat-card.ok .stat-num{color:var(--ok);}
+.stat-card.danger .stat-num{color:var(--danger);}
+.stat-card.warn .stat-num{color:var(--orange);}
+
+/* CHECKLIST MENU */
+.checklist-list{padding:0 16px 28px;display:flex;flex-direction:column;gap:8px;}
+.checklist-item{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-lg);padding:14px 14px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:border-color 0.15s;}
+.checklist-item:active{background:var(--grey-light);}
+.checklist-item.has-orange{border-left:4px solid var(--orange);}
+.checklist-icon{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;}
+.checklist-info{flex:1;min-width:0;}
+.checklist-info h3{font-size:15px;font-weight:600;color:var(--text);}
+.checklist-info p{font-size:12px;color:var(--text-muted);margin-top:2px;}
+.checklist-status{font-size:12px;font-weight:700;white-space:nowrap;flex-shrink:0;}
+.checklist-status.done{color:var(--ok);}
+.checklist-status.due{color:var(--orange);}
+.checklist-status.overdue{color:var(--danger);}
+.chevron{color:var(--grey-dark);font-size:18px;flex-shrink:0;}
+.progress-bar{height:3px;background:var(--grey);border-radius:2px;margin-top:6px;}
+.progress-fill{height:100%;border-radius:2px;background:var(--orange);transition:width 0.3s;}
+
+/* TASK LIST */
+.task-list{padding:8px 16px 110px;display:flex;flex-direction:column;gap:8px;}
+.task-card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;}
+.task-card.completed{border-color:#b8dfc8;}
+.task-card.flagged-card{border-color:#f5b8b3;}
+.task-row{display:flex;align-items:flex-start;gap:12px;padding:14px 14px;cursor:pointer;}
+.task-row:active{background:var(--grey-light);}
+.task-check{width:26px;height:26px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;transition:all 0.15s;font-size:13px;font-weight:700;}
+.task-check.checked{background:var(--ok);border-color:var(--ok);color:white;}
+.task-check.flagged{background:var(--danger);border-color:var(--danger);color:white;}
+.task-body{flex:1;}
+.task-body h4{font-size:14px;font-weight:500;line-height:1.35;}
+.task-signed{font-size:11px;color:var(--ok);margin-top:4px;display:block;font-style:italic;}
+.task-flagged-note{font-size:11px;color:var(--danger);margin-top:4px;display:block;}
+.task-photo-badge{font-size:10px;font-weight:700;color:var(--orange-dark);background:var(--orange-light);padding:2px 7px;border-radius:4px;margin-top:5px;display:inline-block;letter-spacing:0.3px;}
+
+/* TEMP */
+.temp-row{display:flex;align-items:center;gap:8px;padding:0 14px 14px;flex-wrap:wrap;}
+.temp-input{width:82px;padding:8px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:15px;text-align:center;color:var(--text);background:var(--surface);}
+.temp-input:focus{outline:none;border-color:var(--orange);}
+.temp-unit{font-size:13px;color:var(--text-muted);}
+.temp-range{font-size:12px;color:var(--text-muted);flex:1;}
+.temp-status{font-size:12px;font-weight:700;}
+.temp-status.ok{color:var(--ok);}
+.temp-status.bad{color:var(--danger);}
+
+/* PHOTO */
+.photo-section{padding:0 14px 14px;}
+.photo-label{font-size:11px;font-weight:700;color:var(--orange-dark);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;display:flex;align-items:center;gap:6px;}
+.photo-label .req-badge{background:var(--orange);color:white;font-size:9px;padding:2px 6px;border-radius:3px;}
+.photo-trigger{display:flex;align-items:center;gap:10px;background:var(--orange-light);border:1.5px dashed var(--orange);border-radius:8px;padding:12px 14px;cursor:pointer;transition:background 0.15s;}
+.photo-trigger:active{background:#ffe0cc;}
+.photo-trigger span{font-size:13px;color:var(--orange-dark);font-weight:500;}
+.photo-trigger .cam-icon{font-size:22px;}
+.photo-preview{position:relative;margin-top:8px;}
+.photo-preview img{width:100%;max-height:200px;object-fit:cover;border-radius:8px;border:1.5px solid var(--border);}
+.photo-remove{position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.55);color:white;border:none;border-radius:50%;width:26px;height:26px;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+input[type="file"].photo-input{display:none;}
+
+/* SUBMIT BANNER */
+.submit-banner{position:fixed;bottom:0;left:0;right:0;background:white;border-top:1.5px solid var(--border);padding:12px 16px 20px;z-index:100;}
+.submit-progress{font-size:12px;color:var(--text-muted);margin-bottom:8px;text-align:center;}
+.submit-btn-wrap{position:relative;}
+
+/* AUDIT */
+.audit-filters{display:flex;gap:8px;padding:12px 16px;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+.filter-chip{white-space:nowrap;padding:7px 14px;border-radius:20px;border:1.5px solid var(--border);background:white;font-size:13px;cursor:pointer;color:var(--text);font-weight:500;}
+.filter-chip.active{background:var(--brown);color:white;border-color:var(--brown);}
+.audit-list{padding:0 16px 24px;display:flex;flex-direction:column;gap:10px;}
+.audit-card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;}
+.audit-card-header{display:flex;justify-content:space-between;align-items:flex-start;padding:14px 14px 10px;}
+.audit-badge{font-size:11px;font-weight:700;padding:4px 9px;border-radius:5px;flex-shrink:0;margin-left:8px;}
+.audit-badge.ok{background:var(--ok-light);color:var(--ok);}
+.audit-badge.flag{background:var(--danger-light);color:var(--danger);}
+.audit-meta{font-size:12px;color:var(--text-muted);margin-top:3px;}
+.audit-tasks{border-top:1.5px solid var(--grey);padding:10px 14px;}
+.audit-task-row{display:flex;justify-content:space-between;align-items:flex-start;padding:5px 0;font-size:13px;gap:8px;}
+.flag-note{font-size:11px;color:var(--danger);text-align:right;max-width:55%;flex-shrink:0;}
+.audit-photo-thumb{width:48px;height:36px;object-fit:cover;border-radius:5px;border:1px solid var(--border);cursor:pointer;margin-top:4px;}
+
+/* FLAG MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:flex-end;z-index:200;}
+.modal{background:white;border-radius:18px 18px 0 0;padding:22px;width:100%;max-width:500px;margin:0 auto;}
+.modal h3{font-size:16px;font-weight:700;margin-bottom:6px;}
+.modal p{font-size:13px;color:var(--text-muted);margin-bottom:12px;line-height:1.5;}
+.modal textarea{width:100%;border:1.5px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;font-family:inherit;resize:none;height:80px;color:var(--text);}
+.modal textarea:focus{outline:none;border-color:var(--orange);}
+.modal-actions{display:flex;gap:8px;margin-top:12px;}
+.modal-actions .btn{flex:1;padding:12px;}
+
+/* SETUP */
+.setup-content{padding:16px;}
+.setup-step{background:white;border:1.5px solid var(--border);border-radius:var(--radius-lg);padding:16px;margin-bottom:12px;}
+.setup-step h3{font-size:14px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:8px;}
+.step-num{background:var(--orange);color:white;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0;}
+.setup-step p,.setup-step li{font-size:13px;color:var(--text-muted);line-height:1.65;}
+.setup-step ul{padding-left:18px;margin-top:6px;}
+.code-block{background:#1a1a1a;color:#ff9f5a;border-radius:8px;padding:14px;font-family:'Menlo','Courier New',monospace;font-size:11px;margin-top:10px;overflow-x:auto;white-space:pre;line-height:1.6;}
+.copy-btn{display:inline-flex;align-items:center;gap:6px;margin-top:8px;padding:7px 14px;background:var(--orange-light);color:var(--orange-dark);border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;}
+.info-banner{background:var(--orange-light);border:1.5px solid #ffc89a;border-radius:9px;padding:12px 14px;font-size:13px;color:var(--brown);margin-bottom:14px;line-height:1.5;}
+
+/* MISC */
+.no-records{text-align:center;padding:48px 16px;color:var(--text-muted);font-size:14px;line-height:1.6;}
+.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--brown);color:white;padding:10px 20px;border-radius:9px;font-size:13px;font-weight:500;z-index:300;opacity:0;transition:opacity 0.2s;pointer-events:none;white-space:nowrap;max-width:90vw;text-align:center;}
+.toast.show{opacity:1;}
+
+/* Photo lightbox */
+.lightbox{position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:400;display:flex;align-items:center;justify-content:center;padding:20px;}
+.lightbox img{max-width:100%;max-height:90vh;border-radius:8px;}
+.lightbox-close{position:absolute;top:16px;right:16px;background:rgba(255,255,255,0.15);border:none;color:white;width:36px;height:36px;border-radius:50%;font-size:18px;cursor:pointer;}
+
+@media(prefers-color-scheme:dark){
+  :root{--text:#f0ece8;--text-muted:#9e9890;--border:#3a3530;--grey-light:#1a1714;--grey:#3a3530;--surface:#24211e;}
+  .login-card,.modal,.submit-banner,.setup-step{background:#24211e;}
+  .field select,.field input,.modal textarea,.temp-input{background:#1a1714;color:#f0ece8;border-color:#3a3530;}
+  .filter-chip{background:#24211e;}
+  .photo-trigger{background:#2a1f14;border-color:#cc5a1a;}
+  .code-block{background:#0d0b09;}
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="screen-login" class="screen active">
+  <div class="login-logo">
+    <div class="logo-title">Bridge <span class="logo-orange">Baker</span></div>
+    <div class="logo-sub">Daily Due Diligence</div>
+  </div>
+  <div class="login-card">
+    <h2>Sign in</h2>
+    <div class="field">
+      <label>Your name</label>
+      <input type="text" id="login-name" placeholder="e.g. Sarah J." autocomplete="name" />
+    </div>
+    <div class="field">
+      <label>Store</label>
+      <select id="login-store">
+        <option value="">Select store…</option>
+        <option value="124 WBR">124 WBR</option>
+        <option value="811 Fulham Rd">811 Fulham Rd</option>
+        <option value="101 Olympia">101 Olympia</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Role</label>
+      <select id="login-role">
+        <option value="staff">Staff</option>
+        <option value="manager">Manager / Auditor</option>
+      </select>
+    </div>
+    <button class="btn btn-primary" onclick="doLogin()">Start checks</button>
+    <button class="btn btn-ghost" onclick="showScreen('screen-setup')">⚙ Setup &amp; email alerts</button>
+  </div>
+</div>
+
+<!-- HOME -->
+<div id="screen-home" class="screen">
+  <div class="header">
+    <div style="flex:1">
+      <h1>Daily Checks <span class="header-sub" id="home-store-label"></span></h1>
+    </div>
+    <button class="header-btn" onclick="goAudit()">Audit</button>
+    <button class="header-btn" onclick="doLogout()">Sign out</button>
+  </div>
+  <div class="home-greeting">
+    <p>Signed in as <strong id="home-name"></strong></p>
+    <span class="date-badge" id="home-date"></span>
+  </div>
+  <div class="section-title">Today's overview</div>
+  <div class="status-grid">
+    <div class="stat-card ok"><div class="stat-num" id="stat-done">0</div><div class="stat-label">Done</div></div>
+    <div class="stat-card danger"><div class="stat-num" id="stat-due">0</div><div class="stat-label">Due now</div></div>
+    <div class="stat-card warn"><div class="stat-num" id="stat-flags">0</div><div class="stat-label">Flags</div></div>
+  </div>
+  <div class="section-title">Checklists</div>
+  <div class="checklist-list" id="checklist-menu"></div>
+</div>
+
+<!-- CHECKLIST -->
+<div id="screen-checklist" class="screen">
+  <div class="header">
+    <button class="header-back" onclick="showScreen('screen-home')">‹</button>
+    <h1 id="checklist-title">Checklist</h1>
+  </div>
+  <div class="task-list" id="task-list"></div>
+  <div class="submit-banner">
+    <div class="submit-progress" id="submit-progress"></div>
+    <button class="btn btn-primary" id="submit-btn" onclick="submitChecklist()">Save progress</button>
+  </div>
+</div>
+
+<!-- AUDIT -->
+<div id="screen-audit" class="screen">
+  <div class="header">
+    <button class="header-back" onclick="showScreen('screen-home')">‹</button>
+    <h1>Audit Log</h1>
+  </div>
+  <div class="audit-filters" id="audit-filters"></div>
+  <div class="audit-list" id="audit-list"></div>
+</div>
+
+<!-- SETUP -->
+<div id="screen-setup" class="screen">
+  <div class="header">
+    <button class="header-back" onclick="showScreen('screen-login')">‹</button>
+    <h1>Setup &amp; Alerts</h1>
+  </div>
+  <div class="setup-content">
+    <div class="info-banner">📧 Email alerts are free via Google Apps Script — no third-party services. Fires instantly on flags, hourly for missed checklists.</div>
+
+    <div class="setup-step">
+      <h3><span class="step-num">1</span> Install on iPhone (Safari only)</h3>
+      <ul>
+        <li>Open the app URL in <strong>Safari</strong></li>
+        <li>Tap the Share button → <strong>Add to Home Screen</strong> → Add</li>
+        <li>Appears as a standalone app — no browser bar</li>
+      </ul>
+    </div>
+    <div class="setup-step">
+      <h3><span class="step-num">2</span> Install on Android / Chrome</h3>
+      <ul>
+        <li>Open the app URL in Chrome</li>
+        <li>Tap the three-dot menu → <strong>Add to Home Screen</strong></li>
+        <li>Or Chrome may show an install banner automatically</li>
+      </ul>
+    </div>
+    <div class="setup-step">
+      <h3><span class="step-num">3</span> Host the app (share with all staff)</h3>
+      <ul>
+        <li>Create a free account at <strong>github.com</strong></li>
+        <li>New repository → upload this HTML file → Settings → Pages → main branch</li>
+        <li>Your URL: <em>yourusername.github.io/repo-name</em></li>
+        <li>Share this URL — staff add it to their home screen from any device</li>
+      </ul>
+    </div>
+    <div class="setup-step">
+      <h3><span class="step-num">4</span> Google Apps Script (logging + alerts)</h3>
+      <ul>
+        <li>sheets.google.com → new sheet → Extensions → Apps Script</li>
+        <li>Delete all default code, paste the script below</li>
+        <li>Edit <strong>MANAGER_EMAIL</strong> at the top</li>
+        <li>Deploy → New deployment → Web app → Anyone → Deploy</li>
+        <li>Copy the Web App URL and paste it in Step 5 below</li>
+      </ul>
+      <div class="code-block" id="apps-script-code">// ── BORN & BREAD — Due Diligence Logger + Alerts ────────────────────────
+// Paste into Google Apps Script. Edit CONFIG then Deploy as Web App.
+
+const MANAGER_EMAIL   = 'hello@mohangundu.com';
+const ALERT_FROM_NAME = 'Bridge Baker Alerts';
+const STORES          = ['124 WBR', '811 Fulham Rd', '101 Olympia'];
+
+const DEADLINES = {
+  'Opening Checks (BOH)': 9,
+  'Temperature Checks':   9,
+  'Delivery Checks':      12,
+  'Cleaning Schedule':    16,
+  'Closing Checks (BOH)': 20,
+};
+
+function doPost(e) {
+  var sheet = SpreadsheetApp.openByUrl('https://docs.google.com/spreadsheets/d/1yykwTh6WV9KXKaQiv4os4J62kR4YHE7yCWFwnyLJkvo/edit').getSheetByName('Sheet1');
+  // Accept either JSON body or FormData (FormData used to avoid CORS preflight)
+  var raw = '';
+  if (e.postData && e.postData.contents) {
+    raw = e.postData.contents;
+  } else if (e.parameter && e.parameter.data) {
+    raw = e.parameter.data;
+  }
+  var data = JSON.parse(raw);
+
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(['Timestamp','Date','Store','Staff',
+      'Checklist','Task','Status','Note','Temp (°C)','Photo?']);
+  }
+
+  data.tasks.forEach(function(task) {
+    sheet.appendRow([
+      data.timestamp, data.date, data.store, data.staff,
+      data.checklistName, task.name, task.status,
+      task.note || '', task.temp || '',
+      task.hasPhoto ? 'Yes' : ''
+    ]);
+  });
+
+  var flags = data.tasks.filter(function(t){ return t.status === 'flag'; });
+  if (flags.length > 0) sendFlagAlert(data, flags);
+
+  return ContentService.createTextOutput('ok')
+    .setMimeType(ContentService.MimeType.TEXT);
+}
+
+function sendFlagAlert(data, flags) {
+  var lines = flags.map(function(t) {
+    var l = '  • ' + t.name;
+    if (t.note) l += '\n    Note: ' + t.note;
+    if (t.temp) l += ' (' + t.temp + '°C)';
+    return l;
+  });
+  GmailApp.sendEmail(MANAGER_EMAIL,
+    '[FLAG] Issue raised: ' + data.checklistName + ' — ' + data.store,
+    'ISSUE FLAGGED — ' + data.store + '\n\n' +
+    'Checklist: ' + data.checklistName + '\n' +
+    'Staff: ' + data.staff + '\n' +
+    'Time: ' + new Date(data.timestamp).toLocaleString('en-GB') + '\n\n' +
+    'Flagged items:\n' + lines.join('\n') + '\n\n' +
+    '— Bridge Baker Due Diligence',
+    { name: ALERT_FROM_NAME });
+}
+
+function checkMissedChecklists() {
+  var now     = new Date();
+  var hour    = now.getHours();
+  var today   = Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  var data    = SpreadsheetApp.openByUrl('https://docs.google.com/spreadsheets/d/1yykwTh6WV9KXKaQiv4os4J62kR4YHE7yCWFwnyLJkvo/edit').getSheetByName('Sheet1').getDataRange().getValues();
+
+  var submitted = new Set();
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][1] === today) submitted.add(data[i][2] + '|' + data[i][4]);
+  }
+
+  var missed = [];
+  STORES.forEach(function(store) {
+    Object.keys(DEADLINES).forEach(function(cl) {
+      if (hour >= DEADLINES[cl] && !submitted.has(store + '|' + cl))
+        missed.push({ store: store, checklist: cl, deadline: DEADLINES[cl] });
+    });
+  });
+  if (!missed.length) return;
+
+  var cache    = CacheService.getScriptCache();
+  var cKey     = 'alerted_' + today + '_' + hour;
+  var alerted  = JSON.parse(cache.get(cKey) || '[]');
+  var newItems = missed.filter(function(m) {
+    return !alerted.includes(m.store + '|' + m.checklist);
+  });
+  if (!newItems.length) return;
+
+  var lines = newItems.map(function(m) {
+    return '  • ' + m.store + ' — ' + m.checklist +
+           ' (due ' + m.deadline + ':00, ' + (hour - m.deadline) + 'h overdue)';
+  });
+
+  GmailApp.sendEmail(MANAGER_EMAIL,
+    '[MISSED] Checklists overdue: ' + newItems.map(function(m){return m.store;}).join(', '),
+    'MISSED CHECKLISTS — ' + today + '\n\n' +
+    lines.join('\n') + '\n\n' +
+    'Please follow up with the relevant store.\n\n' +
+    '— Bridge Baker Due Diligence',
+    { name: ALERT_FROM_NAME });
+
+  alerted = alerted.concat(newItems.map(function(m){return m.store+'|'+m.checklist;}));
+  cache.put(cKey, JSON.stringify(alerted), 7200);
+}
+
+// Called by the app — handles both logging (action=log) and fetching records
+function doGet(e) {
+  var action = e.parameter.action || '';
+
+  // LOG: app sends a checklist submission via GET to avoid CORS POST issues
+  if (action === 'log') {
+    try {
+      var rec = JSON.parse(decodeURIComponent(e.parameter.data || '{}'));
+      var sheet = SpreadsheetApp.openByUrl('https://docs.google.com/spreadsheets/d/1yykwTh6WV9KXKaQiv4os4J62kR4YHE7yCWFwnyLJkvo/edit').getSheetByName('Sheet1');
+      if (sheet.getLastRow() === 0) {
+        sheet.appendRow(['Timestamp','Date','Store','Staff',
+          'Checklist','Task','Status','Note','Temp (°C)','Photo?']);
+      }
+      rec.tasks.forEach(function(task) {
+        sheet.appendRow([
+          rec.timestamp, rec.date, rec.store, rec.staff,
+          rec.checklistName, task.name, task.status,
+          task.note || '', task.temp || '',
+          task.hasPhoto ? 'Yes' : ''
+        ]);
+      });
+      var flags = rec.tasks.filter(function(t){ return t.status === 'flag'; });
+      if (flags.length > 0) sendFlagAlert(rec, flags);
+    } catch(err) {
+      Logger.log('Log error: ' + err.message);
+    }
+    return ContentService
+      .createTextOutput('ok')
+      .setMimeType(ContentService.MimeType.TEXT);
+  }
+
+  // FETCH: return today's records for cross-device sync
+  var store   = e.parameter.store || '';
+  var date    = e.parameter.date  || '';
+  var sheet   = SpreadsheetApp.openByUrl('https://docs.google.com/spreadsheets/d/1yykwTh6WV9KXKaQiv4os4J62kR4YHE7yCWFwnyLJkvo/edit').getSheetByName('Sheet1');
+  var data    = sheet.getDataRange().getValues();
+  var headers = data[0];
+
+  // Group rows back into checklist submission objects
+  var grouped = {};
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+    // Columns: Timestamp,Date,Store,Staff,Checklist,Task,Status,Note,Temp,Photo?
+    if (row[1] !== date || row[2] !== store) continue;
+    // Use timestamp+staff+checklist as a grouping key
+    var key = row[0] + '|' + row[3] + '|' + row[4];
+    if (!grouped[key]) {
+      grouped[key] = {
+        id: new Date(row[0]).getTime(),
+        timestamp: new Date(row[0]).toISOString(),
+        date: row[1], store: row[2], staff: row[3],
+        checklistId: toChecklistId(row[4]),
+        checklistName: row[4],
+        partial: false, hasFlag: false, tasks: []
+      };
+    }
+    var status = row[6] || 'pending';
+    grouped[key].tasks.push({
+      name: row[5], status: status,
+      note: row[7] || '', temp: row[8] || '',
+      hasPhoto: row[9] === 'Yes', photo: null,
+      signedBy: row[3]
+    });
+    if (status === 'flag') grouped[key].hasFlag = true;
+  }
+
+  var result = Object.values(grouped);
+  result.forEach(function(rec){
+    var pending = rec.tasks.filter(function(t){return t.status==='pending';}).length;
+    rec.partial = pending > 0;
+  });
+
+  // Support JSONP for cross-origin GET from browsers
+  var callback = e.parameter.callback;
+  if (callback) {
+    return ContentService
+      .createTextOutput(callback + '(' + JSON.stringify(result) + ')')
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  return ContentService
+    .createTextOutput(JSON.stringify(result))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function toChecklistId(name) {
+  var map = {
+    'Opening Checks (BOH)': 'opening',
+    'Temperature Checks':   'temperature',
+    'Delivery Checks':      'delivery',
+    'Cleaning Schedule':    'cleaning',
+    'Closing Checks (BOH)': 'closing'
+  };
+  return map[name] || name.toLowerCase().replace(/\s+/g,'_');
+}</div>
+      <button class="copy-btn" onclick="copyScript()">📋 Copy script</button>
+    </div>
+
+    <div class="setup-step">
+      <h3><span class="step-num">5</span> Paste Web App URL here</h3>
+      <div class="field" style="margin-top:10px">
+        <label>Google Apps Script Web App URL</label>
+        <input type="url" id="setup-webhook" placeholder="https://script.google.com/macros/s/…/exec" />
+      </div>
+      <button class="btn btn-primary" style="margin-top:8px" onclick="saveWebhook()">Save URL</button>
+    </div>
+
+    <div class="setup-step">
+      <h3><span class="step-num">6</span> Set hourly missed-checklist trigger</h3>
+      <ul>
+        <li>In Apps Script, click the <strong>clock icon</strong> (Triggers)</li>
+        <li>+ Add Trigger → function: <strong>checkMissedChecklists</strong></li>
+        <li>Time-driven → Hour timer → Every hour → Save</li>
+        <li>Authorise when prompted</li>
+      </ul>
+    </div>
+
+    <div class="setup-step">
+      <h3><span class="step-num">7</span> Manager PIN</h3>
+      <div class="field" style="margin-top:8px">
+        <label>4-digit PIN (protects audit view)</label>
+        <input type="password" id="setup-pin" placeholder="e.g. 1234" maxlength="4" inputmode="numeric" />
+      </div>
+      <button class="btn btn-primary" style="margin-top:8px" onclick="savePin()">Save PIN</button>
+    </div>
+  </div>
+</div>
+
+<!-- FLAG MODAL -->
+<div class="modal-overlay" id="modal" style="display:none" onclick="closeModalBg(event)">
+  <div class="modal">
+    <h3 id="modal-title">Flag an issue</h3>
+    <p>Describe the problem — this is logged and emailed to the manager immediately.</p>
+    <textarea id="modal-note" placeholder="e.g. Fridge temp reading 8°C, engineer called…"></textarea>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="hideModal()">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmFlag()">Flag &amp; continue</button>
+    </div>
+  </div>
+</div>
+
+<!-- LIGHTBOX -->
+<div class="lightbox" id="lightbox" style="display:none" onclick="hideLightbox()">
+  <button class="lightbox-close" onclick="hideLightbox()">✕</button>
+  <img id="lightbox-img" src="" alt="Evidence photo" />
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── CHECKLIST DATA ────────────────────────────────────────────────────────
+const CHECKLISTS = [
+  {
+    id:'opening', label:'Opening Checks (BOH)', icon:'🌅', color:'#fff0e6',
+    dueHour:7, dueHourEnd:10,
+    tasks:[
+      {id:'op1', name:'Fridges working', type:'check'},
+      {id:'op2', name:'Freezers working', type:'check'},
+      {id:'op3', name:'Ovens working', type:'check'},
+      {id:'op4', name:'Staff wearing clean clothes / hair net', type:'check'},
+      {id:'op5', name:'Work surfaces clean', type:'check'},
+      {id:'op6', name:'No pest activity', type:'check'},
+      {id:'op7', name:'Cleaning supplies stocked', type:'check'},
+      {id:'op8', name:'Hot water working', type:'check'},
+      {id:'op9', name:'Blue roll in the holder', type:'check'},
+      {id:'op10', name:'Probe thermometer &amp; wipes available', type:'check'},
+    ]
+  },
+  {
+    id:'temperature', label:'Temperature Checks', icon:'🌡️', color:'#e8f5e9',
+    dueHour:7, dueHourEnd:10,
+    tasks:[
+      {id:'t1', name:'Display fridge', type:'temp', min:1, max:5, requirePhoto:true},
+      {id:'t2', name:'Back kitchen fridge', type:'temp', min:1, max:5, requirePhoto:true},
+      {id:'t3', name:'Freezer', type:'temp', min:-22, max:-18, requirePhoto:true},
+      {id:'t4', name:'Hot hold (pastries / savouries)', type:'temp', min:63, max:85},
+      {id:'t5', name:'Dishwasher rinse temp', type:'temp', min:82, max:95},
+    ]
+  },
+  {
+    id:'delivery', label:'Delivery Checks', icon:'🚚', color:'#f3e5f5',
+    dueHour:0, dueHourEnd:23,
+    tasks:[
+      {id:'d1', name:'Delivery vehicle clean and refrigerated', type:'check'},
+      {id:'d2', name:'All items within use-by date', type:'check'},
+      {id:'d3', name:'Chill items temp on arrival (≤5°C)', type:'temp', min:-30, max:5},
+      {id:'d4', name:'Packaging intact — no damage or pest signs', type:'check'},
+      {id:'d5', name:'Items stored correctly immediately', type:'check'},
+      {id:'d6', name:'Delivery note signed and filed', type:'check'},
+    ]
+  },
+  {
+    id:'cleaning', label:'Cleaning Schedule', icon:'🧹', color:'#e3f2fd',
+    dueHour:14, dueHourEnd:17,
+    tasks:[
+      {id:'cl1', name:'Coffee machine backflush &amp; steam arm wiped', type:'check'},
+      {id:'cl2', name:'Countertops and displays wiped down', type:'check'},
+      {id:'cl3', name:'Floors swept and mopped (kitchen + FOH)', type:'check'},
+      {id:'cl4', name:'Bins emptied and relined', type:'check'},
+      {id:'cl5', name:'Toilet + handwash areas checked &amp; restocked', type:'check'},
+      {id:'cl6', name:'All chopping boards sanitised', type:'check'},
+      {id:'cl7', name:'Grease traps checked', type:'check'},
+      {id:'cl8', name:'Cleaning equipment cleaned', type:'check'},
+    ]
+  },
+  {
+    id:'closing', label:'Closing Checks (BOH)', icon:'🌙', color:'#ede7f6',
+    dueHour:17, dueHourEnd:21,
+    tasks:[
+      {id:'cc1', name:'Food covered, labelled and put in fridge/freezer', type:'check'},
+      {id:'cc2', name:'Food past use-by date thrown away', type:'check'},
+      {id:'cc3', name:'Cleaning equipment cleaned', type:'check'},
+      {id:'cc4', name:'Waste removed, new bin bags fitted', type:'check'},
+      {id:'cc5', name:'Food prep area clean and disinfected', type:'check'},
+      {id:'cc6', name:'Floors swept clean', type:'check'},
+      {id:'cc7', name:'Temperature checks recorded', type:'check'},
+      {id:'cc8', name:'All equipment powered down (ovens, fryers, etc.)', type:'check'},
+      {id:'cc9', name:'Alarm set and premises locked', type:'check'},
+      {id:'cc10', name:'Till reconciled and cash secured', type:'check'},
+    ]
+  }
+];
+
+// ── STATE ─────────────────────────────────────────────────────────────────
+let currentUser = {name:'',store:'',role:''};
+let currentChecklist = null;
+let taskStates = {};
+let flagTarget = null;
+let auditFilter = 'all';
+
+// ── STORAGE ───────────────────────────────────────────────────────────────
+function getRecords(){try{return JSON.parse(localStorage.getItem('bb_records')||'[]');}catch{return[];}}
+function saveRecord(rec){const r=getRecords();r.unshift(rec);localStorage.setItem('bb_records',JSON.stringify(r.slice(0,300)));}
+function getWebhook(){return localStorage.getItem('bb_webhook')||'';}
+function getPin(){return localStorage.getItem('bb_pin')||'';}
+
+// ── NAV ───────────────────────────────────────────────────────────────────
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0,0);
+  if(id==='screen-home') renderHome();
+  if(id==='screen-audit') renderAudit();
+}
+function goAudit(){
+  const pin=getPin();
+  if(currentUser.role!=='manager'&&pin){
+    const e=prompt('Manager PIN required:');
+    if(e!==pin){showToast('Incorrect PIN');return;}
+  }
+  showScreen('screen-audit');
+}
+
+// ── LOGIN ─────────────────────────────────────────────────────────────────
+function doLogin(){
+  const name=document.getElementById('login-name').value.trim();
+  const store=document.getElementById('login-store').value;
+  const role=document.getElementById('login-role').value;
+  if(!name){showToast('Please enter your name');return;}
+  if(!store){showToast('Please select a store');return;}
+  if(role==='manager'){
+    const pin=getPin();
+    if(pin){const e=prompt('Enter manager PIN:');if(e!==pin){showToast('Incorrect PIN');return;}}
+  }
+  currentUser={name,store,role};
+  showScreen('screen-home');
+}
+function doLogout(){currentUser={name:'',store:'',role:''};showScreen('screen-login');}
+
+// ── HOME ──────────────────────────────────────────────────────────────────
+function renderHome(){
+  document.getElementById('home-name').textContent=currentUser.name;
+  document.getElementById('home-store-label').textContent=currentUser.store;
+  const now=new Date();
+  document.getElementById('home-date').textContent=now.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'});
+  const todayKey=toDateKey(now);
+  const recs=getRecords().filter(r=>r.store===currentUser.store&&r.date===todayKey);
+
+  // For each checklist, build merged task state across all saves
+  function getMergedState(clId, tasks){
+    const saves=recs.filter(r=>r.checklistId===clId);
+    const merged={};
+    tasks.forEach(t=>{merged[t.id]='pending';});
+    saves.slice().reverse().forEach(save=>{
+      save.tasks.forEach(t=>{if(t.status!=='pending') merged[t.id]=t.status;});
+    });
+    return merged;
+  }
+
+  let totalDone=0,flagCount=0;
+  CHECKLISTS.forEach(cl=>{
+    const merged=getMergedState(cl.id,cl.tasks);
+    const completedCount=Object.values(merged).filter(s=>s!=='pending').length;
+    if(completedCount===cl.tasks.length) totalDone++;
+    if(recs.some(r=>r.checklistId===cl.id&&r.hasFlag)) flagCount++;
+  });
+
+  const nowH=now.getHours();
+  let dueCount=0;
+  CHECKLISTS.forEach(cl=>{
+    const merged=getMergedState(cl.id,cl.tasks);
+    const allDone=Object.values(merged).every(s=>s!=='pending');
+    if(!allDone&&nowH>=cl.dueHour) dueCount++;
+  });
+  document.getElementById('stat-done').textContent=totalDone;
+  document.getElementById('stat-due').textContent=dueCount;
+  document.getElementById('stat-flags').textContent=flagCount;
+  const menu=document.getElementById('checklist-menu');
+  menu.innerHTML='';
+  CHECKLISTS.forEach(cl=>{
+    const merged=getMergedState(cl.id,cl.tasks);
+    const completedCount=Object.values(merged).filter(s=>s!=='pending').length;
+    const allDone=completedCount===cl.tasks.length;
+    const hasSaves=recs.some(r=>r.checklistId===cl.id);
+    const flagged=recs.some(r=>r.checklistId===cl.id&&r.hasFlag);
+    const overdue=!allDone&&nowH>cl.dueHourEnd;
+    const due=!allDone&&nowH>=cl.dueHour&&!overdue;
+    const total=cl.tasks.length;
+    const pct=allDone?100:Math.round(completedCount/total*100);
+    let st='',sc='';
+    if(allDone&&flagged){st='⚠ Done with flags';sc='overdue';}
+    else if(allDone){st='✓ Complete';sc='done';}
+    else if(overdue){st='● Overdue';sc='overdue';}
+    else if(due){st='● Due now';sc='due';}
+    else{st=`Due ${cl.dueHour}:00`;sc='';}
+    menu.innerHTML+=`<div class="checklist-item${due||overdue?' has-orange':''}" onclick="openChecklist('${cl.id}')">
+      <div class="checklist-icon" style="background:${cl.color}">${cl.icon}</div>
+      <div class="checklist-info">
+        <h3>${cl.label}</h3>
+        <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+        <p style="margin-top:3px">${allDone?`${total}/${total} tasks`:hasSaves?`${completedCount}/${total} tasks`:`${total} tasks`}</p>
+      </div>
+      <span class="checklist-status ${sc}">${st}</span>
+      <span class="chevron">›</span>
+    </div>`;
+  });
+}
+
+// ── CHECKLIST ─────────────────────────────────────────────────────────────
+function openChecklist(id){
+  currentChecklist=CHECKLISTS.find(c=>c.id===id);
+  taskStates={};
+  currentChecklist.tasks.forEach(t=>{taskStates[t.id]={status:'pending',note:'',temp:'',photo:null};});
+  document.getElementById('checklist-title').textContent=currentChecklist.icon+' '+currentChecklist.label;
+  showScreen('screen-checklist');
+  // Sync from Sheets first (cross-device), then merge and render
+  const todayKey=toDateKey(new Date());
+  syncFromSheets(currentUser.store,todayKey).then(()=>{
+    mergeAndRender(id,todayKey);
+  });
+}
+
+function mergeAndRender(id,todayKey){
+  // Reset to pending, then apply all saves oldest-first so newest sign-off wins
+  currentChecklist.tasks.forEach(t=>{
+    if(taskStates[t.id].status==='pending'){ /* keep */ }
+  });
+  const allSaves=getRecords().filter(r=>r.store===currentUser.store&&r.date===todayKey&&r.checklistId===id);
+  allSaves.slice().reverse().forEach(save=>{
+    save.tasks.forEach(t=>{
+      if(t.status!=='pending'){
+        taskStates[t.id]={status:t.status,note:t.note||'',temp:t.temp||'',photo:t.photo||null,signedBy:t.signedBy||save.staff};
+      }
+    });
+  });
+  renderTaskList();
+}
+
+function renderTaskList(){
+  const list=document.getElementById('task-list');
+  list.innerHTML='';
+  currentChecklist.tasks.forEach(task=>{
+    const s=taskStates[task.id];
+    let chkHtml='';
+    if(s.status==='ok') chkHtml='<div class="task-check checked">✓</div>';
+    else if(s.status==='flag') chkHtml='<div class="task-check flagged">!</div>';
+    else chkHtml='<div class="task-check"></div>';
+
+    let noteHtml='';
+    if(s.status==='ok'&&task.type==='check'){
+      const who=s.signedBy||currentUser.name;
+      noteHtml=`<span class="task-signed">✓ Signed off — ${who}</span>`;
+    }
+    if(s.status==='flag') noteHtml=`<span class="task-flagged-note">⚠ ${s.note||'Issue flagged'}</span>`;
+    if(task.requirePhoto) noteHtml+=`<span class="task-photo-badge">📷 PHOTO REQUIRED</span>`;
+
+    let tempHtml='';
+    if(task.type==='temp'){
+      const v=s.temp,n=parseFloat(v);
+      const inR=v!==''&&n>=task.min&&n<=task.max;
+      const outR=v!==''&&!inR;
+      tempHtml=`<div class="temp-row">
+        <input class="temp-input" type="number" value="${v}" placeholder="0"
+          oninput="setTemp('${task.id}',this.value,${task.min},${task.max})" step="0.1" inputmode="decimal"/>
+        <span class="temp-unit">°C</span>
+        <span class="temp-range">Range: ${task.min} to ${task.max}°C</span>
+        <span class="temp-status ${inR?'ok':outR?'bad':''}" id="ts_${task.id}">${inR?'✓ OK':outR?'✗ Out of range':''}</span>
+      </div>`;
+    }
+
+    let photoHtml='';
+    if(task.requirePhoto){
+      const hasPhoto=!!s.photo;
+      photoHtml=`<div class="photo-section">
+        <div class="photo-label">Evidence photo <span class="req-badge">REQUIRED</span></div>
+        ${hasPhoto
+          ? `<div class="photo-preview">
+               <img src="${s.photo}" alt="Evidence" onclick="showLightbox('${task.id}')"/>
+               <button class="photo-remove" onclick="removePhoto('${task.id}')">✕</button>
+             </div>`
+          : `<label class="photo-trigger" for="photo_${task.id}">
+               <span class="cam-icon">📷</span>
+               <span>Tap to take photo or choose from library</span>
+             </label>`
+        }
+        <input type="file" accept="image/*" capture="environment" class="photo-input"
+          id="photo_${task.id}" onchange="handlePhoto('${task.id}',this)"/>
+      </div>`;
+    }
+
+    const cardClass=s.status==='ok'?'completed':s.status==='flag'?'flagged-card':'';
+    list.innerHTML+=`<div class="task-card ${cardClass}" id="card_${task.id}">
+      <div class="task-row" onclick="${task.type==='check'?`toggleTask('${task.id}')`:''}" style="${task.type!=='check'?'cursor:default':''}">
+        ${chkHtml}
+        <div class="task-body"><h4>${task.name}</h4>${noteHtml}</div>
+      </div>
+      ${tempHtml}${photoHtml}
+    </div>`;
+  });
+  updateBanner();
+}
+
+function toggleTask(id){
+  const s=taskStates[id];
+  if(s.status==='pending'){s.status='ok';renderTaskList();showToast('✓ Signed off');}
+  else if(s.status==='ok'){
+    flagTarget=id;
+    const task=currentChecklist.tasks.find(t=>t.id===id);
+    document.getElementById('modal-title').textContent=task.name;
+    document.getElementById('modal-note').value='';
+    document.getElementById('modal').style.display='flex';
+  } else {s.status='pending';s.note='';renderTaskList();}
+}
+
+function setTemp(id,val,min,max){
+  taskStates[id].temp=val;
+  const n=parseFloat(val);
+  if(!isNaN(n)){
+    const ok=n>=min&&n<=max;
+    taskStates[id].status=ok?'ok':'flag';
+    taskStates[id].note=ok?'':`Temperature ${n}°C out of range (${min}–${max}°C)`;
+  } else {taskStates[id].status='pending';}
+  const el=document.getElementById(`ts_${id}`);
+  if(el){const inR=!isNaN(n)&&n>=min&&n<=max;const outR=!isNaN(n)&&!inR;el.className=`temp-status ${inR?'ok':outR?'bad':''}`;el.textContent=inR?'✓ OK':outR?'✗ Out of range':'';}
+  updateBanner();
+}
+
+function handlePhoto(taskId,input){
+  const file=input.files[0];
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    taskStates[taskId].photo=e.target.result;
+    // Re-evaluate status after photo added
+    checkPhotoStatus(taskId);
+    renderTaskList();
+    showToast('📷 Photo saved');
+  };
+  reader.readAsDataURL(file);
+}
+
+function removePhoto(taskId){
+  taskStates[taskId].photo=null;
+  checkPhotoStatus(taskId);
+  renderTaskList();
+}
+
+function checkPhotoStatus(taskId){
+  // For photo-required temp tasks, ensure we account for photo in completion
+  updateBanner();
+}
+
+function isTaskComplete(task){
+  const s=taskStates[task.id];
+  if(s.status==='pending') return false;
+  if(task.requirePhoto && !s.photo) return false;
+  return true;
+}
+
+function updateBanner(){
+  const total=currentChecklist.tasks.length;
+  const done=currentChecklist.tasks.filter(t=>isTaskComplete(t)).length;
+  const photosPending=currentChecklist.tasks.filter(t=>t.requirePhoto&&taskStates[t.id].status!=='pending'&&!taskStates[t.id].photo).length;
+  const allDone=done===total&&photosPending===0;
+  let msg=`${done} of ${total} tasks completed`;
+  if(photosPending>0) msg+=` — ${photosPending} photo${photosPending>1?'s':''} still needed`;
+  if(allDone) msg='All tasks complete — ready to submit';
+  document.getElementById('submit-progress').textContent=msg;
+  const btn=document.getElementById('submit-btn');
+  btn.textContent=allDone?'Submit checklist ✓':'Save progress';
+  btn.style.background=allDone?'var(--ok)':'var(--orange)';
+  btn.disabled=false;
+}
+
+function submitChecklist(){
+  // Block only if a photo is required and actioned but missing the photo
+  const photoMissing=currentChecklist.tasks.filter(t=>
+    t.requirePhoto && taskStates[t.id].status!=='pending' && !taskStates[t.id].photo);
+  if(photoMissing.length>0){showToast(`📷 Photo required: ${photoMissing[0].name}`);return;}
+
+  const taskArr=currentChecklist.tasks.map(t=>({
+    name:t.name, status:taskStates[t.id].status,
+    note:taskStates[t.id].note, temp:taskStates[t.id].temp,
+    photo:taskStates[t.id].photo||null,
+    hasPhoto:!!taskStates[t.id].photo,
+    signedBy:taskStates[t.id].status!=='pending'?currentUser.name:null
+  }));
+
+  const done=taskArr.filter(t=>t.status!=='pending').length;
+  const total=taskArr.length;
+  const allDone=done===total;
+  const hasFlag=taskArr.some(t=>t.status==='flag');
+
+  const rec={
+    id:Date.now(), timestamp:new Date().toISOString(), date:toDateKey(new Date()),
+    store:currentUser.store, staff:currentUser.name,
+    checklistId:currentChecklist.id, checklistName:currentChecklist.label,
+    partial:!allDone, hasFlag, tasks:taskArr
+  };
+  saveRecord(rec);
+  sendToSheets(rec);
+
+  if(allDone){
+    showToast(hasFlag?'⚠ Submitted — manager alerted':'✓ Checklist complete');
+  } else {
+    showToast(`✓ Progress saved (${done}/${total} tasks)`);
+  }
+  setTimeout(()=>showScreen('screen-home'),900);
+}
+
+async function sendToSheets(rec){
+  const url=PRECONFIGURED_WEBHOOK||getWebhook();
+  if(!url){showToast('❌ No webhook URL');return;}
+  const payload={...rec,tasks:rec.tasks.map(t=>({...t,photo:undefined}))};
+  showToast('📡 Sending to Sheets…');
+  try{
+    // Use GET with encoded payload — avoids all CORS/preflight issues
+    const encoded=encodeURIComponent(JSON.stringify(payload));
+    const getUrl=url+'?action=log&data='+encoded;
+    const img=new Image();
+    img.src=getUrl;
+    // Also try fetch GET as backup
+    fetch(getUrl,{mode:'no-cors'}).catch(()=>{});
+    showToast('✓ Sheets: data sent');
+  }catch(err){
+    showToast('❌ Failed: '+err.message);
+  }
+}
+
+// Pull today's records from Sheets into local storage (cross-device sync)
+// Uses a script-tag injection to bypass CORS on GET requests
+async function syncFromSheets(store,dateKey){
+  const url=PRECONFIGURED_WEBHOOK||getWebhook();if(!url)return;
+  return new Promise((resolve)=>{
+    const callbackName='bb_sync_'+Date.now();
+    const src=url+'?store='+encodeURIComponent(store)+'&date='+dateKey+'&callback='+callbackName;
+    const script=document.createElement('script');
+    const timer=setTimeout(()=>{
+      cleanup();resolve(); // timeout after 5s — don't block the UI
+    },5000);
+    window[callbackName]=function(remote){
+      cleanup();
+      if(!Array.isArray(remote)||remote.length===0){resolve();return;}
+      const local=getRecords();
+      const localIds=new Set(local.map(r=>String(r.id)));
+      let added=0;
+      remote.forEach(function(r){
+        if(!localIds.has(String(r.id))){local.push(r);added++;}
+      });
+      if(added>0){
+        local.sort((a,b)=>b.id-a.id);
+        localStorage.setItem('bb_records',JSON.stringify(local.slice(0,300)));
+        console.log('Synced '+added+' remote record(s) from Sheets');
+      }
+      resolve();
+    };
+    function cleanup(){
+      clearTimeout(timer);
+      delete window[callbackName];
+      if(script.parentNode)script.parentNode.removeChild(script);
+    }
+    script.onerror=()=>{cleanup();resolve();};
+    script.src=src;
+    document.head.appendChild(script);
+  });
+}
+
+// ── MODAL ─────────────────────────────────────────────────────────────────
+function closeModalBg(e){if(e.target.id==='modal')hideModal();}
+function hideModal(){document.getElementById('modal').style.display='none';flagTarget=null;}
+function confirmFlag(){
+  if(!flagTarget)return;
+  const note=document.getElementById('modal-note').value.trim();
+  taskStates[flagTarget].status='flag';
+  taskStates[flagTarget].note=note||'Issue flagged';
+  hideModal();renderTaskList();showToast('⚠ Issue flagged');
+}
+
+// ── AUDIT ─────────────────────────────────────────────────────────────────
+function renderAudit(){
+  const records=getRecords();
+  const stores=['all',...new Set(records.map(r=>r.store))];
+  document.getElementById('audit-filters').innerHTML=stores.map(s=>
+    `<div class="filter-chip ${auditFilter===s?'active':''}" onclick="setAuditFilter('${s}')">${s==='all'?'All stores':s}</div>`
+  ).join('');
+  const filtered=auditFilter==='all'?records:records.filter(r=>r.store===auditFilter);
+  const list=document.getElementById('audit-list');
+  if(!filtered.length){list.innerHTML='<div class="no-records">No records yet.<br>Complete a checklist to see it here.</div>';return;}
+  list.innerHTML=filtered.slice(0,60).map(rec=>{
+    const dt=new Date(rec.timestamp);
+    const time=dt.toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+    const flagCount=rec.tasks.filter(t=>t.status==='flag').length;
+    const taskRows=rec.tasks.map(t=>{
+      const icon=t.status==='ok'?'✓':t.status==='flag'?'⚠':'–';
+      const col=t.status==='ok'?'var(--ok)':t.status==='flag'?'var(--danger)':'var(--text-muted)';
+      const photoThumb=t.photo?`<img class="audit-photo-thumb" src="${t.photo}" alt="photo" onclick="showLightboxSrc('${t.photo}')" />`:'';
+      return `<div class="audit-task-row">
+        <span style="flex:1"><span style="color:${col};margin-right:6px">${icon}</span>${t.name}${t.temp?` (${t.temp}°C)`:''}</span>
+        ${t.note?`<span class="flag-note">${t.note}</span>`:''}
+      </div>${photoThumb?`<div style="padding:2px 0 6px 22px">${photoThumb}</div>`:''}`;
+    }).join('');
+    return `<div class="audit-card">
+      <div class="audit-card-header">
+        <div><strong>${rec.checklistName}</strong><div class="audit-meta">${rec.store} · ${rec.staff} · ${time}</div></div>
+        <span class="audit-badge ${rec.hasFlag?'flag':'ok'}">${rec.hasFlag?`⚠ ${flagCount} flag${flagCount>1?'s':''}`:'✓ All clear'}</span>
+      </div>
+      <div class="audit-tasks">${taskRows}</div>
+    </div>`;
+  }).join('');
+}
+function setAuditFilter(s){auditFilter=s;renderAudit();}
+
+// ── PHOTO LIGHTBOX ────────────────────────────────────────────────────────
+function showLightbox(taskId){showLightboxSrc(taskStates[taskId].photo);}
+function showLightboxSrc(src){document.getElementById('lightbox-img').src=src;document.getElementById('lightbox').style.display='flex';}
+function hideLightbox(){document.getElementById('lightbox').style.display='none';}
+
+// ── SETUP ─────────────────────────────────────────────────────────────────
+function saveWebhook(){const u=document.getElementById('setup-webhook').value.trim();localStorage.setItem('bb_webhook',u);showToast('URL saved ✓');}
+function savePin(){const p=document.getElementById('setup-pin').value.trim();if(p.length!==4||isNaN(p)){showToast('Enter a 4-digit PIN');return;}localStorage.setItem('bb_pin',p);showToast('PIN saved ✓');}
+function copyScript(){const t=document.getElementById('apps-script-code').textContent;navigator.clipboard.writeText(t).then(()=>showToast('Script copied ✓')).catch(()=>showToast('Copy manually from the code box'));}
+
+// ── UTILS ─────────────────────────────────────────────────────────────────
+// Pre-configured settings
+const PRECONFIGURED_WEBHOOK = 'https://script.google.com/macros/s/AKfycbxjflrgwkbpfvcVXVUuuxesqan71TJ_NXIIa2OV2D0YGQhKMnb0aRy0SmdZg3ogCmK6sg/exec';
+const PRECONFIGURED_PIN = '1234';
+
+window.addEventListener('load',()=>{
+  // Use pre-configured values if nothing saved yet
+  if(!localStorage.getItem('bb_webhook')&&PRECONFIGURED_WEBHOOK){
+    localStorage.setItem('bb_webhook',PRECONFIGURED_WEBHOOK);
+  }
+  if(!localStorage.getItem('bb_pin')&&PRECONFIGURED_PIN){
+    localStorage.setItem('bb_pin',PRECONFIGURED_PIN);
+  }
+  const wh=getWebhook();if(wh)document.getElementById('setup-webhook').value=wh;
+  const pin=getPin();if(pin)document.getElementById('setup-pin').value=pin;
+});
+function toDateKey(d){const yr=d.getFullYear();const mo=String(d.getMonth()+1).padStart(2,'0');const dy=String(d.getDate()).padStart(2,'0');return yr+'-'+mo+'-'+dy;}
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),5000);}
+</script>
+</body>
+</html>
