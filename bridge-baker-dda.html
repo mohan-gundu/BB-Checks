@@ -149,7 +149,7 @@ input[type="file"].photo-input{display:none;}
 .audit-card-header{display:flex;justify-content:space-between;align-items:flex-start;padding:14px 14px 10px;}
 .audit-badge{font-size:11px;font-weight:700;padding:4px 9px;border-radius:5px;flex-shrink:0;margin-left:8px;}
 .audit-badge.ok{background:var(--ok-light);color:var(--ok);}
-.audit-badge.flag覆{background:var(--danger-light);color:var(--danger);}
+.audit-badge.flag{background:var(--danger-light);color:var(--danger);}
 .audit-meta{font-size:12px;color:var(--text-muted);margin-top:3px;}
 .audit-tasks{border-top:1.5px solid var(--grey);padding:10px 14px;}
 .audit-task-row{display:flex;justify-content:space-between;align-items:flex-start;padding:5px 0;font-size:13px;gap:8px;}
@@ -418,7 +418,7 @@ const CHECKLISTS = [
       {id:'cl1', name:'Coffee machine backflush &amp; steam arm wiped', type:'check'},
       {id:'cl2', name:'Countertops and displays wiped down', type:'check'},
       {id:'cl3', name:'Floors swept and mopped (kitchen + FOH)', type:'check'},
-      {id:'cl4', name:'Bins emptied and relined', type:'check'}, // FIXED TYPO Snag HERE
+      {id:'cl4', name:'Bins emptied and relined', type:'check'},
       {id:'cl5', name:'Toilet + handwash areas checked &amp; restocked', type:'check'},
       {id:'cl6', name:'All chopping boards sanitised', type:'check'},
       {id:'cl7', name:'Grease traps checked', type:'check'},
@@ -504,7 +504,6 @@ function renderHome(){
   const todayKey=toDateKey(now);
   const recs=getRecords().filter(r=>r.store===currentUser.store&&r.date===todayKey);
 
-  // FIXED LOOKUP: Match row metrics by literal name string to link cross-user entries safely
   function getMergedState(clId, tasks){
     const saves=recs.filter(r=>r.checklistId===clId);
     const merged={};
@@ -590,7 +589,6 @@ function mergeAndRender(id,todayKey){
   const allSaves=getRecords().filter(r=>r.store===currentUser.store&&r.date===todayKey&&r.checklistId===id);
   allSaves.slice().reverse().forEach(save=>{
     save.tasks.forEach(t=>{
-      // FIXED LOOKUP: Safely map historical data arrays using literal title parameters
       const match = currentChecklist.tasks.find(taskDef => taskDef.name === t.name);
       if(match && t.status!=='pending'){
         taskStates[match.id]={status:t.status,note:t.note||'',temp:t.temp||'',photo:t.photo||null,signedBy:t.signedBy||save.staff};
