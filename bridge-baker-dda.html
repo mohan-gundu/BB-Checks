@@ -738,6 +738,7 @@ function checkPhotoStatus(taskId){
   updateBanner();
 }
 
+// Check if task is complete
 function isTaskComplete(task){
   const s=taskStates[task.id];
   if(s.status==='pending') return false;
