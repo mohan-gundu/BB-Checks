@@ -563,6 +563,10 @@ function openChecklist(id){
   taskStates={};
   currentChecklist.tasks.forEach(t=>{taskStates[t.id]={status:'pending',note:'',temp:'',photo:null};});
   document.getElementById('checklist-title').textContent=currentChecklist.icon+' '+currentChecklist.label;
+  
+  // THE FIX: Wipe out the old checklist text instantly so it doesn't "ghost" while loading
+  document.getElementById('task-list').innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);font-weight:500;">⏳ Syncing latest logs...</div>';
+  
   showScreen('screen-checklist');
   const todayKey=toDateKey(new Date());
   syncFromSheets(currentUser.store,todayKey).then(()=>{
