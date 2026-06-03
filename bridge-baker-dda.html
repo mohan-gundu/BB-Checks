@@ -166,39 +166,26 @@ input[type="file"].photo-input{display:none;}
 .modal-actions{display:flex;gap:8px;margin-top:12px;}
 .modal-actions .btn{flex:1;padding:12px;}
 
-/* SETUP */
-.setup-content{padding:16px;}
-.setup-step{background:white;border:1.5px solid var(--border);border-radius:var(--radius-lg);padding:16px;margin-bottom:12px;}
-.setup-step h3{font-size:14px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:8px;}
-.step-num{background:var(--orange);color:white;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0;}
-.setup-step p,.setup-step li{font-size:13px;color:var(--text-muted);line-height:1.65;}
-.setup-step ul{padding-left:18px;margin-top:6px;}
-.code-block{background:#1a1a1a;color:#ff9f5a;border-radius:8px;padding:14px;font-family:'Menlo','Courier New',monospace;font-size:11px;margin-top:10px;overflow-x:auto;white-space:pre;line-height:1.6;}
-.copy-btn{display:inline-flex;align-items:center;gap:6px;margin-top:8px;padding:7px 14px;background:var(--orange-light);color:var(--orange-dark);border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;}
-.info-banner{background:var(--orange-light);border:1.5px solid #ffc89a;border-radius:9px;padding:12px 14px;font-size:13px;color:var(--brown);margin-bottom:14px;line-height:1.5;}
-
-/* MISC */
-.no-records{text-align:center;padding:48px 16px;color:var(--text-muted);font-size:14px;line-height:1.6;}
-.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--brown);color:white;padding:10px 20px;border-radius:9px;font-size:13px;font-weight:500;z-index:300;opacity:0;transition:opacity 0.2s;pointer-events:none;white-space:nowrap;max-width:90vw;text-align:center;}
-.toast.show{opacity:1;}
-
-/* Photo lightbox */
+/* LIGHTBOX */
 .lightbox{position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:400;display:flex;align-items:center;justify-content:center;padding:20px;}
 .lightbox img{max-width:100%;max-height:90vh;border-radius:8px;}
 .lightbox-close{position:absolute;top:16px;right:16px;background:rgba(255,255,255,0.15);border:none;color:white;width:36px;height:36px;border-radius:50%;font-size:18px;cursor:pointer;}
 
+.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--brown);color:white;padding:10px 20px;border-radius:9px;font-size:13px;font-weight:500;z-index:300;opacity:0;transition:opacity 0.2s;pointer-events:none;white-space:nowrap;max-width:90vw;text-align:center;}
+.toast.show{opacity:1;}
+
 @media(prefers-color-scheme:dark){
   :root{--text:#f0ece8;--text-muted:#9e9890;--border:#3a3530;--grey-light:#1a1714;--grey:#3a3530;--surface:#24211e;}
-  .login-card,.modal,.submit-banner,.setup-step{background:#24211e;}
+  .login-card,.modal,.submit-banner{background:#24211e;}
   .field select,.field input,.modal textarea,.temp-input{background:#1a1714;color:#f0ece8;border-color:#3a3530;}
   .filter-chip{background:#24211e;}
   .photo-trigger{background:#2a1f14;border-color:#cc5a1a;}
-  .code-block{background:#0d0b09;}
 }
 </style>
 </head>
 <body>
 
+<!-- LOGIN -->
 <div id="screen-login" class="screen active">
   <div class="login-logo">
     <div class="logo-title">Bridge <span class="logo-orange">Baker</span></div>
@@ -208,7 +195,9 @@ input[type="file"].photo-input{display:none;}
     <h2>Sign in</h2>
     <div class="field">
       <label>Your name</label>
-      <input type="text" id="login-name" placeholder="e.g. Sarah J." autocomplete="name" />
+      <!-- Autocomplete input block matching database choices -->
+      <input type="text" id="login-name" placeholder="Type name to search..." list="staff-list" autocomplete="off" />
+      <datalist id="staff-list"></datalist>
     </div>
     <div class="field">
       <label>Store</label>
@@ -219,24 +208,17 @@ input[type="file"].photo-input{display:none;}
         <option value="101 Olympia">101 Olympia</option>
       </select>
     </div>
-    <div class="field">
-      <label>Role</label>
-      <select id="login-role">
-        <option value="staff">Staff</option>
-        <option value="manager">Manager / Auditor</option>
-      </select>
-    </div>
     <button class="btn btn-primary" onclick="doLogin()">Start checks</button>
-    <button class="btn btn-ghost" onclick="showScreen('screen-setup')">⚙ Setup & email alerts</button>
   </div>
 </div>
 
+<!-- HOME -->
 <div id="screen-home" class="screen">
   <div class="header">
     <div style="flex:1">
       <h1>Daily Checks <span class="header-sub" id="home-store-label"></span></h1>
     </div>
-    <button class="header-btn" onclick="goAudit()">Audit</button>
+    <button class="header-btn" id="audit-btn-lockout" style="display:none;" onclick="goAudit()">Audit</button>
     <button class="header-btn" onclick="doLogout()">Sign out</button>
   </div>
   <div class="home-greeting">
@@ -253,6 +235,7 @@ input[type="file"].photo-input{display:none;}
   <div class="checklist-list" id="checklist-menu"></div>
 </div>
 
+<!-- CHECKLIST -->
 <div id="screen-checklist" class="screen">
   <div class="header">
     <button class="header-back" onclick="showScreen('screen-home')">‹</button>
@@ -265,6 +248,7 @@ input[type="file"].photo-input{display:none;}
   </div>
 </div>
 
+<!-- AUDIT -->
 <div id="screen-audit" class="screen">
   <div class="header">
     <button class="header-back" onclick="showScreen('screen-home')">‹</button>
@@ -274,86 +258,11 @@ input[type="file"].photo-input{display:none;}
   <div class="audit-list" id="audit-list"></div>
 </div>
 
-<div id="screen-setup" class="screen">
-  <div class="header">
-    <button class="header-back" onclick="showScreen('screen-login')">‹</button>
-    <h1>Setup & Alerts</h1>
-  </div>
-  <div class="setup-content">
-    <div class="info-banner">📧 Email alerts are free via Google Apps Script — no third-party services. Fires instantly on flags, hourly for missed checklists.</div>
-
-    <div class="setup-step">
-      <h3><span class="step-num">1</span> Install on iPhone (Safari only)</h3>
-      <ul>
-        <li>Open the app URL in <strong>Safari</strong></li>
-        <li>Tap the Share button → <strong>Add to Home Screen</strong> → Add</li>
-        <li>Appears as a standalone app — no browser bar</li>
-      </ul>
-    </div>
-    <div class="setup-step">
-      <h3><span class="step-num">2</span> Install on Android / Chrome</h3>
-      <ul>
-        <li>Open the app URL in Chrome</li>
-        <li>Tap the three-dot menu → <strong>Add to Home Screen</strong></li>
-        <li>Or Chrome may show an install banner automatically</li>
-      </ul>
-    </div>
-    <div class="setup-step">
-      <h3><span class="step-num">3</span> Host the app (share with all staff)</h3>
-      <ul>
-        <li>Create a free account at <strong>github.com</strong></li>
-        <li>New repository → upload this HTML file → Settings → Pages → main branch</li>
-        <li>Your URL: <em>yourusername.github.io/repo-name</em></li>
-        <li>Share this URL — staff add it to their home screen from any device</li>
-      </ul>
-    </div>
-    <div class="setup-step">
-      <h3><span class="step-num">4</span> Google Apps Script (logging + alerts)</h3>
-      <ul>
-        <li>sheets.google.com → new sheet → Extensions → Apps Script</li>
-        <li>Delete all default code, paste the script below</li>
-        <li>Edit <strong>MANAGER_EMAIL</strong> at the top</li>
-        <li>Deploy → New deployment → Web app → Anyone → Deploy</li>
-        <li>Copy the Web App URL and paste it in Step 5 below</li>
-      </ul>
-      <div class="code-block" id="apps-script-code">// Consolidated script is stored securely inside Google Apps script environment.</div>
-      <button class="copy-btn" onclick="copyScript()">📋 Copy script reference</button>
-    </div>
-
-    <div class="setup-step">
-      <h3><span class="step-num">5</span> Paste Web App URL here</h3>
-      <div class="field" style="margin-top:10px">
-        <label>Google Apps Script Web App URL</label>
-        <input type="url" id="setup-webhook" placeholder="https://script.google.com/macros/s/…/exec" />
-      </div>
-      <button class="btn btn-primary" style="margin-top:8px" onclick="saveWebhook()">Save URL</button>
-    </div>
-
-    <div class="setup-step">
-      <h3><span class="step-num">6</span> Set hourly missed-checklist trigger</h3>
-      <ul>
-        <li>In Apps Script, click the <strong>clock icon</strong> (Triggers)</li>
-        <li>+ Add Trigger → function: <strong>checkMissedChecklists</strong></li>
-        <li>Time-driven → Hour timer → Every hour → Save</li>
-        <li>Authorise when prompted</li>
-      </ul>
-    </div>
-
-    <div class="setup-step">
-      <h3><span class="step-num">7</span> Manager PIN</h3>
-      <div class="field" style="margin-top:8px">
-        <label>4-digit PIN (protects audit view)</label>
-        <input type="password" id="setup-pin" placeholder="e.g. 1234" maxlength="4" inputmode="numeric" />
-      </div>
-      <button class="btn btn-primary" style="margin-top:8px" onclick="savePin()">Save PIN</button>
-    </div>
-  </div>
-</div>
-
+<!-- FLAG MODAL -->
 <div class="modal-overlay" id="modal" style="display:none" onclick="closeModalBg(event)">
   <div class="modal">
     <h3 id="modal-title">Flag an issue</h3>
-    <p>Describe the problem — this is logged and emailed to the manager immediately.</p>
+    <p>Describe the problem — this is logged and handled immediately.</p>
     <textarea id="modal-note" placeholder="e.g. Fridge temp reading 8°C, engineer called…"></textarea>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="hideModal()">Cancel</button>
@@ -362,6 +271,7 @@ input[type="file"].photo-input{display:none;}
   </div>
 </div>
 
+<!-- LIGHTBOX -->
 <div class="lightbox" id="lightbox" style="display:none" onclick="hideLightbox()">
   <button class="lightbox-close" onclick="hideLightbox()">✕</button>
   <img id="lightbox-img" src="" alt="Evidence photo" />
@@ -370,8 +280,9 @@ input[type="file"].photo-input{display:none;}
 <div class="toast" id="toast"></div>
 
 <script>
-// DYNAMIC GLOBAL STATE HOLDER (Wiped hardcoded data)
+// LIVE DATA METRICS FETCHED INSTANTLY ON SYSTEM LOAD
 let CHECKLISTS = [];
+let STAFF_ROSTER = [];
 
 let currentUser = {name:'',store:'',role:''};
 let currentChecklist = null;
@@ -382,7 +293,6 @@ let auditFilter = 'all';
 function getRecords(){try{return JSON.parse(localStorage.getItem('bb_records')||'[]');}catch{return[];}}
 function saveRecord(rec){const r=getRecords();r.unshift(rec);localStorage.setItem('bb_records',JSON.stringify(r.slice(0,300)));}
 function getWebhook(){return localStorage.getItem('bb_webhook')||'';}
-function getPin(){return localStorage.getItem('bb_pin')||'';}
 
 function showScreen(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
@@ -397,43 +307,74 @@ function showScreen(id){
   }
   if(id==='screen-audit') renderAudit();
 }
+
 function goAudit(){
-  const pin=getPin();
-  if(currentUser.role!=='manager'&&pin){
-    const e=prompt('Manager PIN required:');
-    if(e!==pin){showToast('Incorrect PIN');return;}
+  if(currentUser.role !== 'manager') {
+    showToast('❌ Access Denied: Managers only');
+    return;
   }
   showScreen('screen-audit');
 }
 
-// UPGRADED LOGIN Engine: Fetches your custom spreadsheet rows immediately upon starting up
+// SECURE AUTOCOMPLETE AUTHENTICATION LOOP
 function doLogin(){
-  const name=document.getElementById('login-name').value.trim();
-  const store=document.getElementById('login-store').value;
-  const role=document.getElementById('login-role').value;
-  if(!name){showToast('Please enter your name');return;}
-  if(!store){showToast('Please select a store');return;}
+  const nameInput = document.getElementById('login-name').value.trim();
+  const store = document.getElementById('login-store').value;
   
-  showToast('📥 Loading live checklist configuration rules...');
-  fetchLayoutRules().then(() => {
-    currentUser={name,store,role};
-    showScreen('screen-home');
-  });
-}
-function doLogout(){currentUser={name:'',store:'',role:''};showScreen('screen-login');}
+  if(!nameInput){showToast('Please type or select your name');return;}
+  if(!store){showToast('Please select a store');return;}
 
-async function fetchLayoutRules() {
+  // Verify chosen profile matches master staff tab row rules exactly
+  const matchedUser = STAFF_ROSTER.find(u => u.displayAs.toLowerCase() === nameInput.toLowerCase());
+  
+  if(!matchedUser) {
+    showToast('❌ Name not found. Pick from the suggested dropdown list.');
+    return;
+  }
+
+  // Challenge step triggered dynamically if profile is assigned as a Manager row
+  if(matchedUser.role === 'manager') {
+    const userPinChallenge = prompt(`Verification Required:\nEnter 4-digit PIN for ${matchedUser.displayAs}:`);
+    if(userPinChallenge !== matchedUser.pin) {
+      showToast('❌ Incorrect Security PIN Access Denied');
+      return;
+    }
+  }
+
+  // Map logging session state (Zero local device tracking data saved upon entry)
+  currentUser = { name: matchedUser.displayAs, store: store, role: matchedUser.role };
+  
+  // Show or hide header audit verification buttons based on active system clearance level
+  document.getElementById('audit-btn-lockout').style.display = (matchedUser.role === 'manager') ? 'block' : 'none';
+  
+  showScreen('screen-home');
+}
+
+function doLogout(){
+  currentUser = {name:'',store:'',role:''};
+  document.getElementById('login-name').value = ''; // Instantly scrub text input on shared machines
+  document.getElementById('login-store').value = '';
+  showScreen('screen-login');
+}
+
+// FETCH SYSTEM DATA IMMEDIATELY ON SHIFT INITIALIZATION
+async function fetchSystemData() {
   const url = PRECONFIGURED_WEBHOOK || getWebhook();
   if (!url) return;
   return new Promise((resolve) => {
-    const callbackName = 'bb_layout_' + Date.now();
+    const callbackName = 'bb_init_' + Date.now();
     const script = document.createElement('script');
-    script.src = url + '?action=getLayoutConfigs&callback=' + callbackName;
+    script.src = url + '?action=getInitData&callback=' + callbackName;
     
-    window[callbackName] = function(data) {
-      if (Array.isArray(data) && data.length > 0) {
-        CHECKLISTS = data;
-        console.log("Successfully imported dynamic layout configurations from spreadsheet tab.");
+    window[callbackName] = function(payload) {
+      if (payload && Array.isArray(payload.checklists)) {
+        CHECKLISTS = payload.checklists;
+        STAFF_ROSTER = payload.staff || [];
+        
+        // Populate the datalist element for search autocomplete selection
+        const datalist = document.getElementById('staff-list');
+        datalist.innerHTML = STAFF_ROSTER.map(person => `<option value="${person.displayAs}">${person.firstName} ${person.lastName} (${person.role})</option>`).join('');
+        console.log("Roster profiles synchronized perfectly from cloud rows.");
       }
       delete window[callbackName];
       if (script.parentNode) script.parentNode.removeChild(script);
@@ -517,7 +458,6 @@ function openChecklist(id){
   currentChecklist=CHECKLISTS.find(c=>c.id===id);
   taskStates={};
   
-  // Tasks are identified using their unique name properties
   currentChecklist.tasks.forEach(t=>{taskStates[t.name]={status:'pending',note:'',temp:'',photo:null};});
   document.getElementById('checklist-title').textContent=currentChecklist.icon+' '+currentChecklist.label;
   document.getElementById('task-list').innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);font-weight:500;">⏳ Syncing latest logs...</div>';
@@ -758,7 +698,9 @@ function confirmFlag(){
 function renderAudit(){
   const records=getRecords();
   const stores=['all',...new Set(records.map(r=>r.store))];
-  document.getElementById('audit-filters').innerHTML=stores.map(s=>`<div class="filter-chip ${auditFilter===s?'active':''}" onclick="setAuditFilter('${s}')">${s==='all'?'All stores':s}</div>`).join('');
+  document.getElementById('audit-filters').innerHTML=stores.map(s=>`
+    <div class="filter-chip ${auditFilter===s?'active':''}" onclick="setAuditFilter('${s}')">${s==='all'?'All stores':s}</div>
+  `).join('');
   const filtered=auditFilter==='all'?records:records.filter(r=>r.store===auditFilter);
   const list=document.getElementById('audit-list');
   if(!filtered.length){list.innerHTML='<div class="no-records">No records yet.</div>';return;}
@@ -779,21 +721,16 @@ function renderAudit(){
 function setAuditFilter(s){auditFilter=s;renderAudit();}
 function showLightboxSrc(src){document.getElementById('lightbox-img').src=src;document.getElementById('lightbox').style.display='flex';}
 function hideLightbox(){document.getElementById('lightbox').style.display='none';}
-function saveWebhook(){localStorage.setItem('bb_webhook',document.getElementById('setup-webhook').value.trim());showToast('URL saved ✓');}
-function savePin(){const p=document.getElementById('setup-pin').value.trim();if(p.length!==4||isNaN(p)){showToast('Enter 4-digit PIN');return;}localStorage.setItem('bb_pin',p);showToast('PIN saved ✓');}
-function copyScript(){navigator.clipboard.writeText("Script stored in Google environment.").then(()=>showToast('Reference copied ✓'));}
+function toDateKey(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),5000);}
 
-const PRECONFIGURED_WEBHOOK = 'https://script.google.com/macros/s/AKfycbzjmW-M45t7KV8scT1aP02qqb7mKLZc-5NCkIO4OP5F50yf5_ONxlkmENegUquftt1q/exec';
-const PRECONFIGURED_PIN = '1234';
+// RUN SILENT SYSTEM DATA TRANSFER IMMEDIATELY UPON LAUNCH
+const PRECONFIGURED_WEBHOOK = 'https://script.google.com/macros/s/AKfycbzbjmW-M45t7KV8scT1aP02qqb7mKLZc-5NCklO4OP5F50yf5_ONxlkmENegUquft1q/exec';
 
 window.addEventListener('load',()=>{
   if(!localStorage.getItem('bb_webhook')&&PRECONFIGURED_WEBHOOK)localStorage.setItem('bb_webhook',PRECONFIGURED_WEBHOOK);
-  if(!localStorage.getItem('bb_pin')&&PRECONFIGURED_PIN)localStorage.setItem('bb_pin',PRECONFIGURED_PIN);
-  const wh=getWebhook();if(wh)document.getElementById('setup-webhook').value=wh;
-  const pin=getPin();if(pin)document.getElementById('setup-pin').value=pin;
+  fetchSystemData();
 });
-function toDateKey(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
-function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),5000);}
 </script>
 </body>
 </html>
