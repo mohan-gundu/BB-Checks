@@ -227,7 +227,7 @@ input[type="file"].photo-input{display:none;}
       </select>
     </div>
     <button class="btn btn-primary" onclick="doLogin()">Start checks</button>
-    <button class="btn btn-ghost" onclick="showScreen('screen-setup')">⚙ Setup &amp; email alerts</button>
+    <button class="btn btn-ghost" onclick="showScreen('screen-setup')">⚙ Setup & email alerts</button>
   </div>
 </div>
 
@@ -277,7 +277,7 @@ input[type="file"].photo-input{display:none;}
 <div id="screen-setup" class="screen">
   <div class="header">
     <button class="header-back" onclick="showScreen('screen-login')">‹</button>
-    <h1>Setup &amp; Alerts</h1>
+    <h1>Setup & Alerts</h1>
   </div>
   <div class="setup-content">
     <div class="info-banner">📧 Email alerts are free via Google Apps Script — no third-party services. Fires instantly on flags, hourly for missed checklists.</div>
@@ -357,7 +357,7 @@ input[type="file"].photo-input{display:none;}
     <textarea id="modal-note" placeholder="e.g. Fridge temp reading 8°C, engineer called…"></textarea>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="hideModal()">Cancel</button>
-      <button class="btn btn-danger" onclick="confirmFlag()">Flag &amp; continue</button>
+      <button class="btn btn-danger" onclick="confirmFlag()">Flag & continue</button>
     </div>
   </div>
 </div>
@@ -370,93 +370,20 @@ input[type="file"].photo-input{display:none;}
 <div class="toast" id="toast"></div>
 
 <script>
-// ── CHECKLIST DATA ────────────────────────────────────────────────────────
-const CHECKLISTS = [
-  {
-    id:'opening', label:'Opening Checks (BOH)', icon:'🌅', color:'#fff0e6',
-    dueHour:7, dueHourEnd:10,
-    tasks:[
-      {id:'op1', name:'Fridges working', type:'check'},
-      {id:'op2', name:'Freezers working', type:'check'},
-      {id:'op3', name:'Ovens working', type:'check'},
-      {id:'op4', name:'Staff wearing clean clothes / hair net', type:'check'},
-      {id:'op5', name:'Work surfaces clean', type:'check'},
-      {id:'op6', name:'No pest activity', type:'check'},
-      {id:'op7', name:'Cleaning supplies stocked', type:'check'},
-      {id:'op8', name:'Hot water working', type:'check'},
-      {id:'op9', name:'Blue roll in the holder', type:'check'},
-      {id:'op10', name:'Probe thermometer &amp; wipes available', type:'check'},
-    ]
-  },
-  {
-    id:'temperature', label:'Temperature Checks', icon:'🌡️', color:'#e8f5e9',
-    dueHour:7, dueHourEnd:10,
-    tasks:[
-      {id:'t1', name:'Display fridge', type:'temp', min:1, max:5, requirePhoto:true},
-      {id:'t2', name:'Back kitchen fridge', type:'temp', min:1, max:5, requirePhoto:true},
-      {id:'t3', name:'Freezer', type:'temp', min:-22, max:-18, requirePhoto:true},
-      {id:'t4', name:'Hot hold (pastries / savouries)', type:'temp', min:63, max:85},
-      {id:'t5', name:'Dishwasher rinse temp', type:'temp', min:82, max:95},
-    ]
-  },
-  {
-    id:'delivery', label:'Delivery Checks', icon:'🚚', color:'#f3e5f5',
-    dueHour:0, dueHourEnd:23,
-    tasks:[
-      {id:'d1', name:'Delivery vehicle clean and refrigerated', type:'check'},
-      {id:'d2', name:'All items within use-by date', type:'check'},
-      {id:'d3', name:'Chill items temp on arrival (≤5°C)', type:'temp', min:-30, max:5},
-      {id:'d4', name:'Packaging intact — no damage or pest signs', type:'check'},
-      {id:'d5', name:'Items stored correctly immediately', type:'check'},
-      {id:'d6', name:'Delivery note signed and filed', type:'check'},
-    ]
-  },
-  {
-    id:'cleaning', label:'Cleaning Schedule', icon:'🧹', color:'#e3f2fd',
-    dueHour:14, dueHourEnd:17,
-    tasks:[
-      {id:'cl1', name:'Coffee machine backflush &amp; steam arm wiped', type:'check'},
-      {id:'cl2', name:'Countertops and displays wiped down', type:'check'},
-      {id:'cl3', name:'Floors swept and mopped (kitchen + FOH)', type:'check'},
-      {id:'cl4', name:'Bins emptied and relined', type:'check'},
-      {id:'cl5', name:'Toilet + handwash areas checked &amp; restocked', type:'check'},
-      {id:'cl6', name:'All chopping boards sanitised', type:'check'},
-      {id:'cl7', name:'Grease traps checked', type:'check'},
-      {id:'cl8', name:'Cleaning equipment cleaned', type:'check'},
-    ]
-  },
-  {
-    id:'closing', label:'Closing Checks (BOH)', icon:'🌙', color:'#ede7f6',
-    dueHour:17, dueHourEnd:21,
-    tasks:[
-      {id:'cc1', name:'Food covered, labelled and put in fridge/freezer', type:'check'},
-      {id:'cc2', name:'Food past use-by date thrown away', type:'check'},
-      {id:'cc3', name:'Cleaning equipment cleaned', type:'check'},
-      {id:'cc4', name:'Waste removed, new bin bags fitted', type:'check'},
-      {id:'cc5', name:'Food past use-by date thrown away', type:'check'},
-      {id:'cc6', name:'Floors swept clean', type:'check'},
-      {id:'cc7', name:'Temperature checks recorded', type:'check'},
-      {id:'cc8', name:'All equipment powered down (ovens, fryers, etc.)', type:'check'},
-      {id:'cc9', name:'Alarm set and premises locked', type:'check'},
-      {id:'cc10', name:'Till reconciled and cash secured', type:'check'},
-    ]
-  }
-];
+// DYNAMIC GLOBAL STATE HOLDER (Wiped hardcoded data)
+let CHECKLISTS = [];
 
-// ── STATE ─────────────────────────────────────────────────────────────────
 let currentUser = {name:'',store:'',role:''};
 let currentChecklist = null;
 let taskStates = {};
 let flagTarget = null;
 let auditFilter = 'all';
 
-// ── STORAGE ───────────────────────────────────────────────────────────────
 function getRecords(){try{return JSON.parse(localStorage.getItem('bb_records')||'[]');}catch{return[];}}
 function saveRecord(rec){const r=getRecords();r.unshift(rec);localStorage.setItem('bb_records',JSON.stringify(r.slice(0,300)));}
 function getWebhook(){return localStorage.getItem('bb_webhook')||'';}
 function getPin(){return localStorage.getItem('bb_pin')||'';}
 
-// ── NAV ───────────────────────────────────────────────────────────────────
 function showScreen(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
@@ -479,23 +406,44 @@ function goAudit(){
   showScreen('screen-audit');
 }
 
-// ── LOGIN ─────────────────────────────────────────────────────────────────
+// UPGRADED LOGIN Engine: Fetches your custom spreadsheet rows immediately upon starting up
 function doLogin(){
   const name=document.getElementById('login-name').value.trim();
   const store=document.getElementById('login-store').value;
   const role=document.getElementById('login-role').value;
   if(!name){showToast('Please enter your name');return;}
   if(!store){showToast('Please select a store');return;}
-  if(role==='manager'){
-    const pin=getPin();
-    if(pin){const e=prompt('Enter manager PIN:');if(e!==pin){showToast('Incorrect PIN');return;}}
-  }
-  currentUser={name,store,role};
-  showScreen('screen-home');
+  
+  showToast('📥 Loading live checklist configuration rules...');
+  fetchLayoutRules().then(() => {
+    currentUser={name,store,role};
+    showScreen('screen-home');
+  });
 }
 function doLogout(){currentUser={name:'',store:'',role:''};showScreen('screen-login');}
 
-// ── HOME ──────────────────────────────────────────────────────────────────
+async function fetchLayoutRules() {
+  const url = PRECONFIGURED_WEBHOOK || getWebhook();
+  if (!url) return;
+  return new Promise((resolve) => {
+    const callbackName = 'bb_layout_' + Date.now();
+    const script = document.createElement('script');
+    script.src = url + '?action=getLayoutConfigs&callback=' + callbackName;
+    
+    window[callbackName] = function(data) {
+      if (Array.isArray(data) && data.length > 0) {
+        CHECKLISTS = data;
+        console.log("Successfully imported dynamic layout configurations from spreadsheet tab.");
+      }
+      delete window[callbackName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+      resolve();
+    };
+    script.onerror = () => { resolve(); };
+    document.head.appendChild(script);
+  });
+}
+
 function renderHome(){
   document.getElementById('home-name').textContent=currentUser.name;
   document.getElementById('home-store-label').textContent=currentUser.store;
@@ -507,11 +455,10 @@ function renderHome(){
   function getMergedState(clId, tasks){
     const saves=recs.filter(r=>r.checklistId===clId);
     const merged={};
-    tasks.forEach(t=>{merged[t.id]='pending';});
+    tasks.forEach(t=>{merged[t.name]='pending';});
     saves.slice().reverse().forEach(save=>{
       save.tasks.forEach(t=>{
-        const match = tasks.find(taskDef => taskDef.name === t.name);
-        if(match && t.status!=='pending') merged[match.id]=t.status;
+        if(t.status!=='pending') merged[t.name]=t.status;
       });
     });
     return merged;
@@ -566,13 +513,13 @@ function renderHome(){
   });
 }
 
-// ── CHECKLIST ─────────────────────────────────────────────────────────────
 function openChecklist(id){
   currentChecklist=CHECKLISTS.find(c=>c.id===id);
   taskStates={};
-  currentChecklist.tasks.forEach(t=>{taskStates[t.id]={status:'pending',note:'',temp:'',photo:null};});
-  document.getElementById('checklist-title').textContent=currentChecklist.icon+' '+currentChecklist.label;
   
+  // Tasks are identified using their unique name properties
+  currentChecklist.tasks.forEach(t=>{taskStates[t.name]={status:'pending',note:'',temp:'',photo:null};});
+  document.getElementById('checklist-title').textContent=currentChecklist.icon+' '+currentChecklist.label;
   document.getElementById('task-list').innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);font-weight:500;">⏳ Syncing latest logs...</div>';
   
   showScreen('screen-checklist');
@@ -583,15 +530,11 @@ function openChecklist(id){
 }
 
 function mergeAndRender(id,todayKey){
-  currentChecklist.tasks.forEach(t=>{
-    if(taskStates[t.id].status==='pending'){ }
-  });
   const allSaves=getRecords().filter(r=>r.store===currentUser.store&&r.date===todayKey&&r.checklistId===id);
   allSaves.slice().reverse().forEach(save=>{
     save.tasks.forEach(t=>{
-      const match = currentChecklist.tasks.find(taskDef => taskDef.name === t.name);
-      if(match && t.status!=='pending'){
-        taskStates[match.id]={status:t.status,note:t.note||'',temp:t.temp||'',photo:t.photo||null,signedBy:t.signedBy||save.staff};
+      if(taskStates[t.name] && t.status!=='pending'){
+        taskStates[t.name]={status:t.status,note:t.note||'',temp:t.temp||'',photo:t.photo||null,signedBy:t.signedBy||save.staff};
       }
     });
   });
@@ -602,7 +545,7 @@ function renderTaskList(){
   const list=document.getElementById('task-list');
   list.innerHTML='';
   currentChecklist.tasks.forEach(task=>{
-    const s=taskStates[task.id];
+    const s=taskStates[task.name];
     let chkHtml='';
     if(s.status==='ok') chkHtml='<div class="task-check checked">✓</div>';
     else if(s.status==='flag') chkHtml='<div class="task-check flagged">!</div>';
@@ -623,11 +566,11 @@ function renderTaskList(){
       const outR=v!==''&&!inR;
       
       tempHtml=`<div class="temp-row">
-        <input class="temp-input" type="text" inputmode="text" value="${v}" placeholder="0"
-          oninput="setTemp('${task.id}',this.value,${task.min},${task.max})" />
+        <input class="temp-input" type="text" value="${v}" placeholder="0"
+          oninput="setTemp('${task.name}',this.value,${task.min},${task.max})" />
         <span class="temp-unit">°C</span>
         <span class="temp-range">Range: ${task.min} to ${task.max}°C</span>
-        <span class="temp-status ${inR?'ok':outR?'bad':''}" id="ts_${task.id}">${inR?'✓ OK':outR?'✗ Out of range':''}</span>
+        <span class="temp-status ${inR?'ok':outR?'bad':''}" id="ts_${task.name.replace(/\s+/g,'_')}">${inR?'✓ OK':outR?'✗ Out of range':''}</span>
       </div>`;
     }
 
@@ -638,22 +581,22 @@ function renderTaskList(){
         <div class="photo-label">Evidence photo <span class="req-badge">REQUIRED</span></div>
         ${hasPhoto
           ? `<div class="photo-preview">
-               <img src="${s.photo}" alt="Evidence" onclick="showLightbox('${task.id}')"/>
-               <button class="photo-remove" onclick="removePhoto('${task.id}')">✕</button>
+               <img src="${s.photo}" alt="Evidence" onclick="showLightbox('${task.name}')"/>
+               <button class="photo-remove" onclick="removePhoto('${task.name}')">✕</button>
              </div>`
-          : `<label class="photo-trigger" for="photo_${task.id}">
+          : `<label class="photo-trigger" for="photo_${task.name.replace(/\s+/g,'_')}">
                <span class="cam-icon">📷</span>
                <span>Tap to take photo or choose from library</span>
              </label>`
         }
         <input type="file" accept="image/*" capture="environment" class="photo-input"
-          id="photo_${task.id}" onchange="handlePhoto('${task.id}',this)"/>
+          id="photo_${task.name.replace(/\s+/g,'_')}" onchange="handlePhoto('${task.name}',this)"/>
       </div>`;
     }
 
     const cardClass=s.status==='ok'?'completed':s.status==='flag'?'flagged-card':'';
-    list.innerHTML+=`<div class="task-card ${cardClass}" id="card_${task.id}">
-      <div class="task-row" onclick="${task.type==='check'?`toggleTask('${task.id}')`:''}" style="${task.type!=='check'?'cursor:default':''}">
+    list.innerHTML+=`<div class="task-card ${cardClass}">
+      <div class="task-row" onclick="${task.type==='check'?`toggleTask('${task.name}')`:''}" style="${task.type!=='check'?'cursor:default':''}">
         ${chkHtml}
         <div class="task-body"><h4>${task.name}</h4>${noteHtml}</div>
       </div>
@@ -663,42 +606,37 @@ function renderTaskList(){
   updateBanner();
 }
 
-function toggleTask(id){
-  const s=taskStates[id];
+function toggleTask(name){
+  const s=taskStates[name];
   if(s.status==='pending'){s.status='ok';renderTaskList();showToast('✓ Signed off');}
   else if(s.status==='ok'){
-    flagTarget=id;
-    const task=currentChecklist.tasks.find(t=>t.id===id);
-    document.getElementById('modal-title').textContent=task.name;
+    flagTarget=name;
+    document.getElementById('modal-title').textContent=name;
     document.getElementById('modal-note').value='';
     document.getElementById('modal').style.display='flex';
   } else {s.status='pending';s.note='';renderTaskList();}
 }
 
-function setTemp(id,val,min,max){
-  taskStates[id].temp=val;
+function setTemp(name,val,min,max){
+  taskStates[name].temp=val;
   const n=parseFloat(val);
   if(!isNaN(n)){
     const ok=n>=min&&n<=max;
-    taskStates[id].status=ok?'ok':'flag';
-    taskStates[id].note=ok?'':`Temperature ${n}°C out of range (${min}–${max}°C)`;
-  } else {taskStates[id].status='pending';}
-  const el=document.getElementById(`ts_${id}`);
+    taskStates[name].status=ok?'ok':'flag';
+    taskStates[name].note=ok?'':`Temperature ${n}°C out of range (${min}–${max}°C)`;
+  } else {taskStates[name].status='pending';}
+  const el=document.getElementById(`ts_${name.replace(/\s+/g,'_')}`);
   if(el){const inR=!isNaN(n)&&n>=min&&n<=max;const outR=!isNaN(n)&&!inR;el.className=`temp-status ${inR?'ok':outR?'bad':''}`;el.textContent=inR?'✓ OK':outR?'✗ Out of range':'';}
   updateBanner();
 }
 
-function handlePhoto(taskId,input){
-  const file=input.files[0];
-  if(!file) return;
-  
+function handlePhoto(taskName,input){
+  const file=input.files[0]; if(!file) return;
   showToast('⏳ Optimizing file metrics...');
   const reader=new FileReader();
   reader.onload=function(e){
-    const rawData = e.target.result;
-    compressImage(rawData).then(compressedData => {
-      taskStates[taskId].photo = compressedData;
-      checkPhotoStatus(taskId);
+    compressImage(e.target.result).then(compressedData => {
+      taskStates[taskName].photo = compressedData;
       renderTaskList();
       showToast('📷 Photo saved & compressed');
     });
@@ -708,42 +646,25 @@ function handlePhoto(taskId,input){
 
 function compressImage(base64Str) {
   return new Promise((resolve) => {
-    const img = new Image();
-    img.src = base64Str;
+    const img = new Image(); img.src = base64Str;
     img.onload = () => {
       const canvas = document.createElement("canvas");
-      const MAX_WIDTH = 800;
-      const MAX_HEIGHT = 600;
-      let width = img.width;
-      let height = img.height;
-
-      if (width > height) {
-        if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
-      } else {
-        if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; }
-      }
-      canvas.width = width;
-      canvas.height = height;
-      
-      const ctx = canvas.getContext("2d");
-      ctx.drawImage(img, 0, 0, width, height);
+      const MAX_WIDTH = 800; const MAX_HEIGHT = 600;
+      let width = img.width; let height = img.height;
+      if (width > height) { if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; } }
+      else { if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; } }
+      canvas.width = width; canvas.height = height;
+      const ctx = canvas.getContext("2d"); ctx.drawImage(img, 0, 0, width, height);
       resolve(canvas.toDataURL("image/jpeg", 0.7));
     };
   });
 }
 
-function removePhoto(taskId){
-  taskStates[taskId].photo=null;
-  checkPhotoStatus(taskId);
-  renderTaskList();
-}
-
-function checkPhotoStatus(taskId){
-  updateBanner();
-}
+function removePhoto(taskName){ taskStates[taskName].photo=null; renderTaskList(); }
+function showLightbox(taskName){ showLightboxSrc(taskStates[taskName].photo); }
 
 function isTaskComplete(task){
-  const s=taskStates[task.id];
+  const s=taskStates[task.name];
   if(s.status==='pending') return false;
   if(task.requirePhoto && !s.photo) return false;
   return true;
@@ -752,7 +673,7 @@ function isTaskComplete(task){
 function updateBanner(){
   const total=currentChecklist.tasks.length;
   const done=currentChecklist.tasks.filter(t=>isTaskComplete(t)).length;
-  const photosPending=currentChecklist.tasks.filter(t=>t.requirePhoto&&taskStates[t.id].status!=='pending'&&!taskStates[t.id].photo).length;
+  const photosPending=currentChecklist.tasks.filter(t=>t.requirePhoto&&taskStates[t.name].status!=='pending'&&!taskStates[t.name].photo).length;
   const allDone=done===total&&photosPending===0;
   let msg=`${done} of ${total} tasks completed`;
   if(photosPending>0) msg+=` — ${photosPending} photo${photosPending>1?'s':''} still needed`;
@@ -766,21 +687,19 @@ function updateBanner(){
 
 function submitChecklist(){
   const photoMissing=currentChecklist.tasks.filter(t=>
-    t.requirePhoto && taskStates[t.id].status!=='pending' && !taskStates[t.id].photo);
+    t.requirePhoto && taskStates[t.name].status!=='pending' && !taskStates[t.name].photo);
   if(photoMissing.length>0){showToast(`📷 Photo required: ${photoMissing[0].name}`);return;}
 
   const taskArr=currentChecklist.tasks.map(t=>({
-    name:t.name, status:taskStates[t.id].status,
-    note:taskStates[t.id].note, temp:taskStates[t.id].temp,
-    photo:taskStates[t.id].photo||null,
-    hasPhoto:!!taskStates[t.id].photo,
-    signedBy:taskStates[t.id].status!=='pending'?currentUser.name:null
+    name:t.name, status:taskStates[t.name].status,
+    note:taskStates[t.name].note, temp:taskStates[t.name].temp,
+    photo:taskStates[t.name].photo||null,
+    hasPhoto:!!taskStates[t.name].photo,
+    signedBy:taskStates[t.name].status!=='pending'?currentUser.name:null
   }));
 
   const done=taskArr.filter(t=>t.status!=='pending').length;
-  const total=taskArr.length;
-  const allDone=done===total;
-  const hasFlag=taskArr.some(t=>t.status==='flag');
+  const total=taskArr.length; const allDone=done===total; const hasFlag=taskArr.some(t=>t.status==='flag');
 
   const rec={
     id:Date.now(), timestamp:new Date().toISOString(), date:toDateKey(new Date()),
@@ -796,40 +715,14 @@ function submitChecklist(){
 }
 
 async function sendToSheets(rec){
-  const url=PRECONFIGURED_WEBHOOK||getWebhook();
-  if(!url){showToast('❌ No web app script configuration found');return;}
-  
+  const url=PRECONFIGURED_WEBHOOK||getWebhook(); if(!url)return;
   const payload = {
-    timestamp: rec.timestamp,
-    date: rec.date,
-    store: rec.store,
-    staff: rec.staff,
-    checklistName: rec.checklistName,
-    tasks: rec.tasks.map(t => ({
-      name: t.name,
-      status: t.status,
-      note: t.note,
-      temp: t.temp,
-      hasPhoto: t.hasPhoto,
-      photoData: t.photo 
-    }))
+    timestamp: rec.timestamp, date: rec.date, store: rec.store, staff: rec.staff, checklistName: rec.checklistName,
+    tasks: rec.tasks.map(t => ({ name: t.name, status: t.status, note: t.note, temp: t.temp, hasPhoto: t.hasPhoto, photoData: t.photo }))
   };
-
   try {
-    const searchParams = new URLSearchParams();
-    searchParams.append("data", JSON.stringify(payload));
-    
-    await fetch(url, {
-      method: "POST",
-      mode: "no-cors", 
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: searchParams.toString()
-    });
-    
-    console.log("Database entry synchronized seamlessly.");
-  } catch(err) {
-    console.error("Transmission breakdown caught: ", err);
-  }
+    await fetch(url, { method: "POST", mode: "no-cors", body: JSON.stringify(payload) });
+  } catch(err) { console.error(err); }
 }
 
 async function syncFromSheets(store,dateKey){
@@ -838,106 +731,68 @@ async function syncFromSheets(store,dateKey){
     const callbackName='bb_sync_'+Date.now();
     const src=url+'?store='+encodeURIComponent(store)+'&date='+dateKey+'&callback='+callbackName;
     const script=document.createElement('script');
-    const timer=setTimeout(()=>{
-      cleanup();resolve(); 
-    },5000);
+    const timer=setTimeout(()=>{ cleanup();resolve(); },5000);
     window[callbackName]=function(remote){
-      cleanup();
-      if(!Array.isArray(remote)||remote.length===0){resolve();return;}
-      const local=getRecords();
-      const localIds=new Set(local.map(r=>String(r.id)));
-      let added=0;
-      remote.forEach(function(r){
-        if(!localIds.has(String(r.id))){local.push(r);added++;}
-      });
+      cleanup(); if(!Array.isArray(remote)||remote.length===0){resolve();return;}
+      const local=getRecords(); const localIds=new Set(local.map(r=>String(r.id))); let added=0;
+      remote.forEach(function(r){ if(!localIds.has(String(r.id))){local.push(r);added++;} });
       if(added>0){
-        local.sort((a,b)=>b.id-a.id);
-        localStorage.setItem('bb_records',JSON.stringify(local.slice(0,300)));
-        console.log('Synced '+added+' remote record(s) from Sheets');
+        local.sort((a,b)=>b.id-a.id); localStorage.setItem('bb_records',JSON.stringify(local.slice(0,300)));
       }
       resolve();
     };
-    function cleanup(){
-      clearTimeout(timer);
-      delete window[callbackName];
-      if(script.parentNode)script.parentNode.removeChild(script);
-    }
-    script.onerror=()=>{cleanup();resolve();};
-    script.src=src;
-    document.head.appendChild(script);
+    function cleanup(){ clearTimeout(timer); delete window[callbackName]; if(script.parentNode)script.parentNode.removeChild(script); }
+    script.onerror=()=>{cleanup();resolve();}; script.src=src; document.head.appendChild(script);
   });
 }
 
-// ── MODAL ─────────────────────────────────────────────────────────────────
 function closeModalBg(e){if(e.target.id==='modal')hideModal();}
 function hideModal(){document.getElementById('modal').style.display='none';flagTarget=null;}
 function confirmFlag(){
   if(!flagTarget)return;
   const note=document.getElementById('modal-note').value.trim();
-  taskStates[flagTarget].status='flag';
-  taskStates[flagTarget].note=note||'Issue flagged';
+  taskStates[flagTarget].status='flag'; taskStates[flagTarget].note=note||'Issue flagged';
   hideModal();renderTaskList();showToast('⚠ Issue flagged');
 }
 
-// ── AUDIT ─────────────────────────────────────────────────────────────────
 function renderAudit(){
   const records=getRecords();
   const stores=['all',...new Set(records.map(r=>r.store))];
-  document.getElementById('audit-filters').innerHTML=stores.map(s=>
-    `<div class="filter-chip ${auditFilter===s?'active':''}" onclick="setAuditFilter('${s}')">${s==='all'?'All stores':s}</div>`
-  ).join('');
+  document.getElementById('audit-filters').innerHTML=stores.map(s=>`<div class="filter-chip ${auditFilter===s?'active':''}" onclick="setAuditFilter('${s}')">${s==='all'?'All stores':s}</div>`).join('');
   const filtered=auditFilter==='all'?records:records.filter(r=>r.store===auditFilter);
   const list=document.getElementById('audit-list');
-  if(!filtered.length){list.innerHTML='<div class="no-records">No records yet.<br>Complete a checklist to see it here.</div>';return;}
+  if(!filtered.length){list.innerHTML='<div class="no-records">No records yet.</div>';return;}
   list.innerHTML=filtered.slice(0,60).map(rec=>{
-    const dt=new Date(rec.timestamp);
-    const time=dt.toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+    const time=new Date(rec.timestamp).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
     const flagCount=rec.tasks.filter(t=>t.status==='flag').length;
     const taskRows=rec.tasks.map(t=>{
       const icon=t.status==='ok'?'✓':t.status==='flag'?'⚠':'✗';
       const col=t.status==='ok'?'var(--ok)':'var(--danger)';
-      const photoThumb=t.photo?`<img class="audit-photo-thumb" src="${t.photo}" alt="photo" onclick="showLightboxSrc('${t.photo}')" />`:'';
       return `<div class="audit-task-row">
         <span style="flex:1"><span style="color:${col};margin-right:6px;font-weight:bold;">${icon}</span>${t.name}${t.temp?` (${t.temp}°C)`:''}</span>
         ${t.note?`<span class="flag-note">${t.note}</span>`:''}
-      </div>${photoThumb?`<div style="padding:2px 0 6px 22px">${photoThumb}</div>`:''}`;
+      </div>${t.photo?`<div style="padding:2px 0 6px 22px"><img class="audit-photo-thumb" src="${t.photo}" onclick="showLightboxSrc('${t.photo}')" /></div>`:''}`;
     }).join('');
-    return `<div class="audit-card">
-      <div class="audit-card-header">
-        <div><strong>${rec.checklistName}</strong><div class="audit-meta">${rec.store} · ${rec.staff} · ${time}</div></div>
-        <span class="audit-badge ${rec.hasFlag?'flag':'ok'}">${rec.hasFlag?`⚠ ${flagCount} flag${flagCount>1?'s':''}`:'✓ All clear'}</span>
-      </div>
-      <div class="audit-tasks">${taskRows}</div>
-    </div>`;
+    return `<div class="audit-card"><div class="audit-card-header"><div><strong>${rec.checklistName}</strong><div class="audit-meta">${rec.store} · ${rec.staff} · ${time}</div></div><span class="audit-badge ${rec.hasFlag?'flag':'ok'}">${rec.hasFlag?`⚠ ${flagCount} flag${flagCount>1?'s':''}`:'✓ All clear'}</span></div><div class="audit-tasks">${taskRows}</div></div>`;
   }).join('');
 }
 function setAuditFilter(s){auditFilter=s;renderAudit();}
-
-// ── PHOTO LIGHTBOX ────────────────────────────────────────────────────────
-function showLightbox(taskId){showLightboxSrc(taskStates[taskId].photo);}
 function showLightboxSrc(src){document.getElementById('lightbox-img').src=src;document.getElementById('lightbox').style.display='flex';}
 function hideLightbox(){document.getElementById('lightbox').style.display='none';}
+function saveWebhook(){localStorage.setItem('bb_webhook',document.getElementById('setup-webhook').value.trim());showToast('URL saved ✓');}
+function savePin(){const p=document.getElementById('setup-pin').value.trim();if(p.length!==4||isNaN(p)){showToast('Enter 4-digit PIN');return;}localStorage.setItem('bb_pin',p);showToast('PIN saved ✓');}
+function copyScript(){navigator.clipboard.writeText("Script stored in Google environment.").then(()=>showToast('Reference copied ✓'));}
 
-// ── SETUP ─────────────────────────────────────────────────────────────────
-function saveWebhook(){const u=document.getElementById('setup-webhook').value.trim();localStorage.setItem('bb_webhook',u);showToast('URL saved ✓');}
-function savePin(){const p=document.getElementById('setup-pin').value.trim();if(p.length!==4||isNaN(p)){showToast('Enter a 4-digit PIN');return;}localStorage.setItem('bb_pin',p);showToast('PIN saved ✓');}
-function copyScript(){const t=document.getElementById('apps-script-code').textContent;navigator.clipboard.writeText(t).then(()=>showToast('Script copied ✓')).catch(()=>showToast('Copy manually from the code box'));}
-
-// ── UTILS ─────────────────────────────────────────────────────────────────
 const PRECONFIGURED_WEBHOOK = 'https://script.google.com/macros/s/AKfycbxjflrgwkbpfvcVXVUuuxesqan71TJ_NXIIa2OV2D0YGQhKMnb0aRy0SmdZg3ogCmK6sg/exec';
 const PRECONFIGURED_PIN = '1234';
 
 window.addEventListener('load',()=>{
-  if(!localStorage.getItem('bb_webhook')&&PRECONFIGURED_WEBHOOK){
-    localStorage.setItem('bb_webhook',PRECONFIGURED_WEBHOOK);
-  }
-  if(!localStorage.getItem('bb_pin')&&PRECONFIGURED_PIN){
-    localStorage.setItem('bb_pin',PRECONFIGURED_PIN);
-  }
+  if(!localStorage.getItem('bb_webhook')&&PRECONFIGURED_WEBHOOK)localStorage.setItem('bb_webhook',PRECONFIGURED_WEBHOOK);
+  if(!localStorage.getItem('bb_pin')&&PRECONFIGURED_PIN)localStorage.setItem('bb_pin',PRECONFIGURED_PIN);
   const wh=getWebhook();if(wh)document.getElementById('setup-webhook').value=wh;
   const pin=getPin();if(pin)document.getElementById('setup-pin').value=pin;
 });
-function toDateKey(d){const yr=d.getFullYear();const mo=String(d.getMonth()+1).padStart(2,'0');const dy=String(d.getDate()).padStart(2,'0');return yr+'-'+mo+'-'+dy;}
+function toDateKey(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),5000);}
 </script>
 </body>
