@@ -185,7 +185,6 @@ input[type="file"].photo-input{display:none;}
 </head>
 <body>
 
-<!-- LOGIN -->
 <div id="screen-login" class="screen active">
   <div class="login-logo">
     <div class="logo-title">Bridge <span class="logo-orange">Baker</span></div>
@@ -195,7 +194,6 @@ input[type="file"].photo-input{display:none;}
     <h2>Sign in</h2>
     <div class="field">
       <label>Your name</label>
-      <!-- Autocomplete input block matching database choices -->
       <input type="text" id="login-name" placeholder="Type name to search..." list="staff-list" autocomplete="off" />
       <datalist id="staff-list"></datalist>
     </div>
@@ -212,7 +210,6 @@ input[type="file"].photo-input{display:none;}
   </div>
 </div>
 
-<!-- HOME -->
 <div id="screen-home" class="screen">
   <div class="header">
     <div style="flex:1">
@@ -235,7 +232,6 @@ input[type="file"].photo-input{display:none;}
   <div class="checklist-list" id="checklist-menu"></div>
 </div>
 
-<!-- CHECKLIST -->
 <div id="screen-checklist" class="screen">
   <div class="header">
     <button class="header-back" onclick="showScreen('screen-home')">‹</button>
@@ -248,7 +244,6 @@ input[type="file"].photo-input{display:none;}
   </div>
 </div>
 
-<!-- AUDIT -->
 <div id="screen-audit" class="screen">
   <div class="header">
     <button class="header-back" onclick="showScreen('screen-home')">‹</button>
@@ -258,7 +253,6 @@ input[type="file"].photo-input{display:none;}
   <div class="audit-list" id="audit-list"></div>
 </div>
 
-<!-- FLAG MODAL -->
 <div class="modal-overlay" id="modal" style="display:none" onclick="closeModalBg(event)">
   <div class="modal">
     <h3 id="modal-title">Flag an issue</h3>
@@ -271,7 +265,6 @@ input[type="file"].photo-input{display:none;}
   </div>
 </div>
 
-<!-- LIGHTBOX -->
 <div class="lightbox" id="lightbox" style="display:none" onclick="hideLightbox()">
   <button class="lightbox-close" onclick="hideLightbox()">✕</button>
   <img id="lightbox-img" src="" alt="Evidence photo" />
@@ -280,7 +273,6 @@ input[type="file"].photo-input{display:none;}
 <div class="toast" id="toast"></div>
 
 <script>
-// LIVE DATA METRICS FETCHED INSTANTLY ON SYSTEM LOAD
 let CHECKLISTS = [];
 let STAFF_ROSTER = [];
 
@@ -316,7 +308,6 @@ function goAudit(){
   showScreen('screen-audit');
 }
 
-// SECURE AUTOCOMPLETE AUTHENTICATION LOOP
 function doLogin(){
   const nameInput = document.getElementById('login-name').value.trim();
   const store = document.getElementById('login-store').value;
@@ -324,7 +315,6 @@ function doLogin(){
   if(!nameInput){showToast('Please type or select your name');return;}
   if(!store){showToast('Please select a store');return;}
 
-  // Verify chosen profile matches master staff tab row rules exactly
   const matchedUser = STAFF_ROSTER.find(u => u.displayAs.toLowerCase() === nameInput.toLowerCase());
   
   if(!matchedUser) {
@@ -332,7 +322,6 @@ function doLogin(){
     return;
   }
 
-  // Challenge step triggered dynamically if profile is assigned as a Manager row
   if(matchedUser.role === 'manager') {
     const userPinChallenge = prompt(`Verification Required:\nEnter 4-digit PIN for ${matchedUser.displayAs}:`);
     if(userPinChallenge !== matchedUser.pin) {
@@ -341,23 +330,18 @@ function doLogin(){
     }
   }
 
-  // Map logging session state (Zero local device tracking data saved upon entry)
   currentUser = { name: matchedUser.displayAs, store: store, role: matchedUser.role };
-  
-  // Show or hide header audit verification buttons based on active system clearance level
   document.getElementById('audit-btn-lockout').style.display = (matchedUser.role === 'manager') ? 'block' : 'none';
-  
   showScreen('screen-home');
 }
 
 function doLogout(){
   currentUser = {name:'',store:'',role:''};
-  document.getElementById('login-name').value = ''; // Instantly scrub text input on shared machines
+  document.getElementById('login-name').value = ''; 
   document.getElementById('login-store').value = '';
   showScreen('screen-login');
 }
 
-// FETCH SYSTEM DATA IMMEDIATELY ON SHIFT INITIALIZATION
 async function fetchSystemData() {
   const url = PRECONFIGURED_WEBHOOK || getWebhook();
   if (!url) return;
@@ -371,7 +355,6 @@ async function fetchSystemData() {
         CHECKLISTS = payload.checklists;
         STAFF_ROSTER = payload.staff || [];
         
-        // Populate the datalist element for search autocomplete selection
         const datalist = document.getElementById('staff-list');
         datalist.innerHTML = STAFF_ROSTER.map(person => `<option value="${person.displayAs}">${person.firstName} ${person.lastName} (${person.role})</option>`).join('');
         console.log("Roster profiles synchronized perfectly from cloud rows.");
@@ -457,11 +440,9 @@ function renderHome(){
 function openChecklist(id){
   currentChecklist=CHECKLISTS.find(c=>c.id===id);
   taskStates={};
-  
   currentChecklist.tasks.forEach(t=>{taskStates[t.name]={status:'pending',note:'',temp:'',photo:null};});
   document.getElementById('checklist-title').textContent=currentChecklist.icon+' '+currentChecklist.label;
   document.getElementById('task-list').innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);font-weight:500;">⏳ Syncing latest logs...</div>';
-  
   showScreen('screen-checklist');
   const todayKey=toDateKey(new Date());
   syncFromSheets(currentUser.store,todayKey).then(()=>{
@@ -504,7 +485,6 @@ function renderTaskList(){
       const v=s.temp,n=parseFloat(v);
       const inR=v!==''&&n>=task.min&&n<=task.max;
       const outR=v!==''&&!inR;
-      
       tempHtml=`<div class="temp-row">
         <input class="temp-input" type="text" value="${v}" placeholder="0"
           oninput="setTemp('${task.name}',this.value,${task.min},${task.max})" />
@@ -724,8 +704,8 @@ function hideLightbox(){document.getElementById('lightbox').style.display='none'
 function toDateKey(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),5000);}
 
-// RUN SILENT SYSTEM DATA TRANSFER IMMEDIATELY UPON LAUNCH
-const PRECONFIGURED_WEBHOOK = 'https://script.google.com/macros/s/AKfycbzbjmW-M45t7KV8scT1aP02qqb7mKLZc-5NCklO4OP5F50yf5_ONxlkmENegUquft1q/exec';
+// THE CORRECT ACTIVE LINK FOR INITIALIZATION
+const PRECONFIGURED_WEBHOOK = 'https://script.google.com/macros/s/AKfycbxjflrgwkbpfvcVXVUuuxesqan71TJ_NXIIa2OV2D0YGQhKMnb0aRy0SmdZg3ogCmK6sg/exec';
 
 window.addEventListener('load',()=>{
   if(!localStorage.getItem('bb_webhook')&&PRECONFIGURED_WEBHOOK)localStorage.setItem('bb_webhook',PRECONFIGURED_WEBHOOK);
