@@ -146,15 +146,6 @@ input[type="file"].photo-input{display:none;}
 .filter-chip.active{background:var(--brown);color:white;border-color:var(--brown);}
 .audit-list{padding:0 16px 24px;display:flex;flex-direction:column;gap:10px;}
 .audit-card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;}
-.audit-card-header{display:flex;justify-content:space-between;align-items:flex-start;padding:14px 14px 10px;}
-.audit-badge{font-size:11px;font-weight:700;padding:4px 9px;border-radius:5px;flex-shrink:0;margin-left:8px;}
-.audit-badge.ok{background:var(--ok-light);color:var(--ok);}
-.audit-badge.flag{background:var(--danger-light);color:var(--danger);}
-.audit-meta{font-size:12px;color:var(--text-muted);margin-top:3px;}
-.audit-tasks{border-top:1.5px solid var(--grey);padding:10px 14px;}
-.audit-task-row{display:flex;justify-content:space-between;align-items:flex-start;padding:5px 0;font-size:13px;gap:8px;}
-.flag-note{font-size:11px;color:var(--danger);text-align:right;max-width:55%;flex-shrink:0;}
-.audit-photo-thumb{width:48px;height:36px;object-fit:cover;border-radius:5px;border:1px solid var(--border);cursor:pointer;margin-top:4px;}
 
 /* FLAG MODAL */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:flex-end;z-index:200;}
@@ -185,6 +176,7 @@ input[type="file"].photo-input{display:none;}
 </head>
 <body>
 
+<!-- LOGIN -->
 <div id="screen-login" class="screen active">
   <div class="login-logo">
     <div class="logo-title">Bridge <span class="logo-orange">Baker</span></div>
@@ -197,7 +189,7 @@ input[type="file"].photo-input{display:none;}
       <input type="text" id="login-name" placeholder="Type name to search..." list="staff-list" autocomplete="off" />
       <datalist id="staff-list"></datalist>
     </div>
-    <div class="field">
+    <div class="field" id="store-dropdown-field">
       <label>Store</label>
       <select id="login-store">
         <option value="">Select store…</option>
@@ -210,6 +202,7 @@ input[type="file"].photo-input{display:none;}
   </div>
 </div>
 
+<!-- HOME -->
 <div id="screen-home" class="screen">
   <div class="header">
     <div style="flex:1">
@@ -225,13 +218,15 @@ input[type="file"].photo-input{display:none;}
   <div class="section-title">Today's overview</div>
   <div class="status-grid">
     <div class="stat-card ok"><div class="stat-num" id="stat-done">0</div><div class="stat-label">Done</div></div>
-    <div class="stat-card danger"><div class="stat-num" id="stat-due">0</div><div class="stat-label">Due now</div></div>
-    <div class="stat-card warn"><div class="stat-num" id="stat-flags">0</div><div class="stat-label">Flags</div></div>
+    <!-- Fast navigation triggers attached directly below -->
+    <div class="stat-card danger" style="cursor:pointer" onclick="jumpToDueNow()"><div class="stat-num" id="stat-due">0</div><div class="stat-label">Due now ↗</div></div>
+    <div class="stat-card warn" style="cursor:pointer" onclick="jumpToFlags()"><div class="stat-num" id="stat-flags">0</div><div class="stat-label">Flags ↗</div></div>
   </div>
   <div class="section-title">Checklists</div>
   <div class="checklist-list" id="checklist-menu"></div>
 </div>
 
+<!-- CHECKLIST -->
 <div id="screen-checklist" class="screen">
   <div class="header">
     <button class="header-back" onclick="showScreen('screen-home')">‹</button>
@@ -244,15 +239,18 @@ input[type="file"].photo-input{display:none;}
   </div>
 </div>
 
+<!-- AUDIT -->
 <div id="screen-audit" class="screen">
   <div class="header">
-    <button class="header-back" onclick="showScreen('screen-home')">‹</button>
-    <h1>Audit Log</h1>
+    <button class="header-back" id="audit-back-btn" onclick="showScreen('screen-home')">‹</button>
+    <h1>Compliance Matrix</h1>
+    <button class="header-btn" id="manager-signout-btn" style="display:none;" onclick="doLogout()">Sign out</button>
   </div>
   <div class="audit-filters" id="audit-filters"></div>
   <div class="audit-list" id="audit-list"></div>
 </div>
 
+<!-- FLAG MODAL -->
 <div class="modal-overlay" id="modal" style="display:none" onclick="closeModalBg(event)">
   <div class="modal">
     <h3 id="modal-title">Flag an issue</h3>
@@ -265,6 +263,7 @@ input[type="file"].photo-input{display:none;}
   </div>
 </div>
 
+<!-- LIGHTBOX -->
 <div class="lightbox" id="lightbox" style="display:none" onclick="hideLightbox()">
   <button class="lightbox-close" onclick="hideLightbox()">✕</button>
   <img id="lightbox-img" src="" alt="Evidence photo" />
@@ -308,15 +307,14 @@ function goAudit(){
   showScreen('screen-audit');
 }
 
+// REDESIGNED LOGIN PATTERN: Managers skip stores, bypass straight to credentials matrix
 function doLogin(){
   const nameInput = document.getElementById('login-name').value.trim();
   const store = document.getElementById('login-store').value;
   
   if(!nameInput){showToast('Please type or select your name');return;}
-  if(!store){showToast('Please select a store');return;}
 
   const matchedUser = STAFF_ROSTER.find(u => u.displayAs.toLowerCase() === nameInput.toLowerCase());
-  
   if(!matchedUser) {
     showToast('❌ Name not found. Pick from the suggested dropdown list.');
     return;
@@ -328,10 +326,20 @@ function doLogin(){
       showToast('❌ Incorrect Security PIN Access Denied');
       return;
     }
+    // Set global access credentials and route managers straight into the matrix audit board
+    currentUser = { name: matchedUser.displayAs, store: 'All Stores', role: matchedUser.role };
+    document.getElementById('audit-back-btn').style.display = 'none';
+    document.getElementById('manager-signout-btn').style.display = 'block';
+    showScreen('screen-audit');
+    return;
   }
 
+  // Fallback to standard staff operational procedures
+  if(!store){showToast('Please select a store');return;}
   currentUser = { name: matchedUser.displayAs, store: store, role: matchedUser.role };
-  document.getElementById('audit-btn-lockout').style.display = (matchedUser.role === 'manager') ? 'block' : 'none';
+  document.getElementById('audit-btn-lockout').style.display = 'none';
+  document.getElementById('audit-back-btn').style.display = 'block';
+  document.getElementById('manager-signout-btn').style.display = 'none';
   showScreen('screen-home');
 }
 
@@ -340,6 +348,54 @@ function doLogout(){
   document.getElementById('login-name').value = ''; 
   document.getElementById('login-store').value = '';
   showScreen('screen-login');
+}
+
+// FAST ROUTING LOGIC Engine: Direct navigation handlers
+function jumpToDueNow() {
+  const now = new Date();
+  const nowH = now.getHours();
+  const todayKey = toDateKey(now);
+  const recs = getRecords().filter(r => r.store === currentUser.store && r.date === todayKey);
+
+  function getMergedState(clId, tasks){
+    const saves = recs.filter(r => r.checklistId === clId);
+    const merged = {};
+    tasks.forEach(t => { merged[t.name] = 'pending'; });
+    saves.slice().reverse().forEach(save => {
+      save.tasks.forEach(t => { if(t.status !== 'pending') merged[t.name] = t.status; });
+    });
+    return merged;
+  }
+
+  for (let cl of CHECKLISTS) {
+    const merged = getMergedState(cl.id, cl.tasks);
+    const allDone = Object.values(merged).every(s => s !== 'pending');
+    if (!allDone && nowH >= cl.dueHour) {
+      openChecklist(cl.id);
+      return;
+    }
+  }
+  showToast("🎉 No pending checklists due right now!");
+}
+
+function jumpToFlags() {
+  if (currentUser.role === 'manager') {
+    showScreen('screen-audit');
+  } else {
+    const todayKey = toDateKey(new Date());
+    const recs = getRecords().filter(r => r.store === currentUser.store && r.date === todayKey && r.hasFlag);
+    if(recs.length === 0) {
+      showToast("All clear! No flags inside the store today.");
+      return;
+    }
+    let summary = "⚠️ Flagged Issues Today:\n";
+    recs.forEach(r => {
+      r.tasks.forEach(t => {
+        if(t.status === 'flag') summary += `\n• [${r.checklistName}] ${t.name}: ${t.note}`;
+      });
+    });
+    alert(summary);
+  }
 }
 
 async function fetchSystemData() {
@@ -440,7 +496,7 @@ function renderHome(){
 function openChecklist(id){
   currentChecklist=CHECKLISTS.find(c=>c.id===id);
   taskStates={};
-  currentChecklist.tasks.forEach(t=>{taskStates[t.name]={status:'pending',note:'',temp:'',photo:null};});
+  currentChecklist.tasks.forEach(t=>{taskStates[t.name]={status:'pending',note:'',temp:'',photo:null,signedBy:null,time:null};});
   document.getElementById('checklist-title').textContent=currentChecklist.icon+' '+currentChecklist.label;
   document.getElementById('task-list').innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);font-weight:500;">⏳ Syncing latest logs...</div>';
   showScreen('screen-checklist');
@@ -455,7 +511,18 @@ function mergeAndRender(id,todayKey){
   allSaves.slice().reverse().forEach(save=>{
     save.tasks.forEach(t=>{
       if(taskStates[t.name] && t.status!=='pending'){
-        taskStates[t.name]={status:t.status,note:t.note||'',temp:t.temp||'',photo:t.photo||null,signedBy:t.signedBy||save.staff};
+        let formattedTime = '';
+        if (save.timestamp) {
+          formattedTime = new Date(save.timestamp).toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'});
+        }
+        taskStates[t.name]={
+          status:t.status,
+          note:t.note||'',
+          temp:t.temp||'',
+          photo:t.photo||null,
+          signedBy:t.signedBy||save.staff,
+          time: formattedTime
+        };
       }
     });
   });
@@ -473,11 +540,16 @@ function renderTaskList(){
     else chkHtml='<div class="task-check"></div>';
 
     let noteHtml='';
-    if(s.status==='ok'&&task.type==='check'){
+    if(s.status==='ok'){
       const who=s.signedBy||currentUser.name;
-      noteHtml=`<span class="task-signed">✓ Signed off — ${who}</span>`;
+      const when=s.time ? ` at ${s.time}` : '';
+      noteHtml=`<span class="task-signed">✓ Signed off — ${who}${when}</span>`;
     }
-    if(s.status==='flag') noteHtml=`<span class="task-flagged-note">⚠ ${s.note||'Issue flagged'}</span>`;
+    if(s.status==='flag') {
+      const who=s.signedBy||currentUser.name;
+      const when=s.time ? ` at ${s.time}` : '';
+      noteHtml=`<span class="task-flagged-note">⚠ ${s.note||'Issue flagged'} (${who}${when})</span>`;
+    }
     if(task.requirePhoto) noteHtml+=`<span class="task-photo-badge">📷 PHOTO REQUIRED</span>`;
 
     let tempHtml='';
@@ -487,7 +559,7 @@ function renderTaskList(){
       const outR=v!==''&&!inR;
       tempHtml=`<div class="temp-row">
         <input class="temp-input" type="text" value="${v}" placeholder="0"
-          oninput="setTemp('${task.name}',this.value,${task.min},${task.max})" />
+          oninput="setTemp('${task.name.replace(/'/g, "\\'")}',this.value,${task.min},${task.max})" />
         <span class="temp-unit">°C</span>
         <span class="temp-range">Range: ${task.min} to ${task.max}°C</span>
         <span class="temp-status ${inR?'ok':outR?'bad':''}" id="ts_${task.name.replace(/\s+/g,'_')}">${inR?'✓ OK':outR?'✗ Out of range':''}</span>
@@ -501,8 +573,8 @@ function renderTaskList(){
         <div class="photo-label">Evidence photo <span class="req-badge">REQUIRED</span></div>
         ${hasPhoto
           ? `<div class="photo-preview">
-               <img src="${s.photo}" alt="Evidence" onclick="showLightbox('${task.name}')"/>
-               <button class="photo-remove" onclick="removePhoto('${task.name}')">✕</button>
+               <img src="${s.photo}" alt="Evidence" onclick="showLightbox('${task.name.replace(/'/g, "\\'")}')"/>
+               <button class="photo-remove" onclick="removePhoto('${task.name.replace(/'/g, "\\'")}')">✕</button>
              </div>`
           : `<label class="photo-trigger" for="photo_${task.name.replace(/\s+/g,'_')}">
                <span class="cam-icon">📷</span>
@@ -510,13 +582,13 @@ function renderTaskList(){
              </label>`
         }
         <input type="file" accept="image/*" capture="environment" class="photo-input"
-          id="photo_${task.name.replace(/\s+/g,'_')}" onchange="handlePhoto('${task.name}',this)"/>
+          id="photo_${task.name.replace(/\s+/g,'_')}" onchange="handlePhoto('${task.name.replace(/'/g, "\\'")}',this)"/>
       </div>`;
     }
 
     const cardClass=s.status==='ok'?'completed':s.status==='flag'?'flagged-card':'';
     list.innerHTML+=`<div class="task-card ${cardClass}">
-      <div class="task-row" onclick="${task.type==='check'?`toggleTask('${task.name}')`:''}" style="${task.type!=='check'?'cursor:default':''}">
+      <div class="task-row" onclick="handleTaskClick('${task.name.replace(/'/g, "\\'")}')">
         ${chkHtml}
         <div class="task-body"><h4>${task.name}</h4>${noteHtml}</div>
       </div>
@@ -526,15 +598,33 @@ function renderTaskList(){
   updateBanner();
 }
 
-function toggleTask(name){
-  const s=taskStates[name];
-  if(s.status==='pending'){s.status='ok';renderTaskList();showToast('✓ Signed off');}
-  else if(s.status==='ok'){
-    flagTarget=name;
-    document.getElementById('modal-title').textContent=name;
-    document.getElementById('modal-note').value='';
-    document.getElementById('modal').style.display='flex';
-  } else {s.status='pending';s.note='';renderTaskList();}
+// ACCIDENTAL CHECK PROTECTION AND SWITCH ENGINE
+function handleTaskClick(name){
+  const s = taskStates[name];
+  if(s.status === 'pending'){
+    s.status = 'ok';
+    s.signedBy = currentUser.name;
+    s.time = new Date().toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'});
+    renderTaskList();
+    showToast('✓ Signed off');
+  } else {
+    let choice = confirm("This task is already signed off. Would you like to uncheck it and reset it back to pending?\n\n(Click 'Cancel' if you want to flag a physical issue instead.)");
+    if(choice) {
+      s.status = 'pending';
+      s.note = '';
+      s.temp = '';
+      s.photo = null;
+      s.signedBy = null;
+      s.time = null;
+      renderTaskList();
+      showToast('Reset to pending');
+    } else {
+      flagTarget = name;
+      document.getElementById('modal-title').textContent = name;
+      document.getElementById('modal-note').value = s.note || '';
+      document.getElementById('modal').style.display = 'flex';
+    }
+  }
 }
 
 function setTemp(name,val,min,max){
@@ -544,7 +634,13 @@ function setTemp(name,val,min,max){
     const ok=n>=min&&n<=max;
     taskStates[name].status=ok?'ok':'flag';
     taskStates[name].note=ok?'':`Temperature ${n}°C out of range (${min}–${max}°C)`;
-  } else {taskStates[name].status='pending';}
+    taskStates[name].signedBy=currentUser.name;
+    taskStates[name].time=new Date().toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'});
+  } else {
+    taskStates[name].status='pending';
+    taskStates[name].signedBy=null;
+    taskStates[name].time=null;
+  }
   const el=document.getElementById(`ts_${name.replace(/\s+/g,'_')}`);
   if(el){const inR=!isNaN(n)&&n>=min&&n<=max;const outR=!isNaN(n)&&!inR;el.className=`temp-status ${inR?'ok':outR?'bad':''}`;el.textContent=inR?'✓ OK':outR?'✗ Out of range':'';}
   updateBanner();
@@ -671,32 +767,85 @@ function hideModal(){document.getElementById('modal').style.display='none';flagT
 function confirmFlag(){
   if(!flagTarget)return;
   const note=document.getElementById('modal-note').value.trim();
-  taskStates[flagTarget].status='flag'; taskStates[flagTarget].note=note||'Issue flagged';
+  taskStates[flagTarget].status='flag'; 
+  taskStates[flagTarget].note=note||'Issue flagged';
+  taskStates[flagTarget].signedBy=currentUser.name;
+  taskStates[flagTarget].time=new Date().toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'});
   hideModal();renderTaskList();showToast('⚠ Issue flagged');
 }
 
+// REDESIGNED ULTIMATE COMPLIANCE MATRIX VIEW ENGINE
 function renderAudit(){
-  const records=getRecords();
-  const stores=['all',...new Set(records.map(r=>r.store))];
-  document.getElementById('audit-filters').innerHTML=stores.map(s=>`
-    <div class="filter-chip ${auditFilter===s?'active':''}" onclick="setAuditFilter('${s}')">${s==='all'?'All stores':s}</div>
+  const records = getRecords();
+  const todayKey = toDateKey(new Date());
+  const stores = ['124 WBR', '811 Fulham Rd', '101 Olympia'];
+  
+  const filtersDiv = document.getElementById('audit-filters');
+  filtersDiv.innerHTML = ['all', ...stores].map(s => `
+    <div class="filter-chip ${auditFilter===s?'active':''}" onclick="setAuditFilter('${s}')">${s==='all'?'All Stores':s}</div>
   `).join('');
-  const filtered=auditFilter==='all'?records:records.filter(r=>r.store===auditFilter);
-  const list=document.getElementById('audit-list');
-  if(!filtered.length){list.innerHTML='<div class="no-records">No records yet.</div>';return;}
-  list.innerHTML=filtered.slice(0,60).map(rec=>{
-    const time=new Date(rec.timestamp).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
-    const flagCount=rec.tasks.filter(t=>t.status==='flag').length;
-    const taskRows=rec.tasks.map(t=>{
-      const icon=t.status==='ok'?'✓':t.status==='flag'?'⚠':'✗';
-      const col=t.status==='ok'?'var(--ok)':'var(--danger)';
-      return `<div class="audit-task-row">
-        <span style="flex:1"><span style="color:${col};margin-right:6px;font-weight:bold;">${icon}</span>${t.name}${t.temp?` (${t.temp}°C)`:''}</span>
-        ${t.note?`<span class="flag-note">${t.note}</span>`:''}
-      </div>${t.photo?`<div style="padding:2px 0 6px 22px"><img class="audit-photo-thumb" src="${t.photo}" onclick="showLightboxSrc('${t.photo}')" /></div>`:''}`;
-    }).join('');
-    return `<div class="audit-card"><div class="audit-card-header"><div><strong>${rec.checklistName}</strong><div class="audit-meta">${rec.store} · ${rec.staff} · ${time}</div></div><span class="audit-badge ${rec.hasFlag?'flag':'ok'}">${rec.hasFlag?`⚠ ${flagCount} flag${flagCount>1?'s':''}`:'✓ All clear'}</span></div><div class="audit-tasks">${taskRows}</div></div>`;
-  }).join('');
+
+  const targetStores = auditFilter === 'all' ? stores : [auditFilter];
+  const list = document.getElementById('audit-list');
+  list.innerHTML = '';
+
+  targetStores.forEach(store => {
+    let storeHtml = `<div style="margin-top:16px; margin-bottom:8px;"><h2 style="font-size:16px; font-weight:700; color:var(--brown); padding:0 4px;">🏢 ${store}</h2></div>`;
+    let checklistsHtml = '';
+    
+    CHECKLISTS.forEach(cl => {
+      const clSaves = records.filter(r => r.store === store && r.date === todayKey && r.checklistId === cl.id);
+      let taskMap = {};
+      cl.tasks.forEach(t => { taskMap[t.name] = { status: 'pending', details: '✗ Pending', photo: null }; });
+      
+      clSaves.slice().reverse().forEach(save => {
+        save.tasks.forEach(t => {
+          if (t.status !== 'pending') {
+            let timePart = save.timestamp ? new Date(save.timestamp).toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'}) : '';
+            if (t.status === 'ok') {
+              taskMap[t.name] = {
+                status: 'ok',
+                details: `✓ Done by ${save.staff} ${timePart ? `at ${timePart}` : ''} ${t.temp ? `(${t.temp}°C)` : ''}`,
+                photo: t.photo || null
+              };
+            } else if (t.status === 'flag') {
+              taskMap[t.name] = {
+                status: 'flag',
+                details: `! Flagged by ${save.staff} ${timePart ? `at ${timePart}` : ''}: ${t.note || 'Issue raised'}`,
+                photo: t.photo || null
+              };
+            }
+          }
+        });
+      });
+
+      let taskRowsHtml = cl.tasks.map(t => {
+        const m = taskMap[t.name];
+        let color = 'var(--text-muted)';
+        if (m.status === 'ok') color = 'var(--ok)';
+        if (m.status === 'flag') color = 'var(--danger)';
+        return `
+          <div style="padding:8px 0; border-bottom:1px solid var(--grey-light); font-size:13px; display:flex; flex-direction:column; gap:2px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+              <span style="font-weight:600; color:var(--text);">${t.name}</span>
+              <span style="font-size:12px; font-weight:700; text-align:right; max-width:65%; color:${color}; font-style:italic;">${m.details}</span>
+            </div>
+            ${m.photo ? `<div style="margin-top:4px;"><img src="${m.photo}" style="width:48px; height:36px; object-fit:cover; border-radius:4px; border:1px solid var(--border); cursor:pointer;" onclick="showLightboxSrc('${m.photo}')" /></div>` : ''}
+          </div>
+        `;
+      }).join('');
+
+      checklistsHtml += `
+        <div class="audit-card" style="margin-bottom:12px; padding:14px; background:var(--surface); border:1.5px solid var(--border); border-radius:var(--radius-lg); box-shadow:0 1px 3px rgba(0,0,0,0.02);">
+          <div style="font-weight:700; font-size:14px; margin-bottom:8px; color:var(--brown); display:flex; align-items:center; gap:6px;">
+            <span>${cl.icon}</span> <span>${cl.label}</span>
+          </div>
+          <div style="display:flex; flex-direction:column;">${taskRowsHtml}</div>
+        </div>
+      `;
+    });
+    list.innerHTML += storeHtml + checklistsHtml;
+  });
 }
 function setAuditFilter(s){auditFilter=s;renderAudit();}
 function showLightboxSrc(src){document.getElementById('lightbox-img').src=src;document.getElementById('lightbox').style.display='flex';}
@@ -704,8 +853,8 @@ function hideLightbox(){document.getElementById('lightbox').style.display='none'
 function toDateKey(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),5000);}
 
-// THE CORRECT ACTIVE LINK FOR INITIALIZATION
-const PRECONFIGURED_WEBHOOK = 'https://script.google.com/macros/s/AKfycbzjmW-M45t7KV8scT1aP02qqb7mKLZc-5NCkIO4OP5F50yf5_ONxlkmENegUquftt1q/exec';
+// MASTER CLOUD SYSTEM WEBHOOK
+const PRECONFIGURED_WEBHOOK = 'https://script.google.com/macros/s/AKfycbzjmW-M45t7KV8scT1aP02qqb7mKLZc-5NCkIO4OP5F50yf5_ONxlkmENegUquft1q/exec';
 
 window.addEventListener('load',()=>{
   if(!localStorage.getItem('bb_webhook')&&PRECONFIGURED_WEBHOOK)localStorage.setItem('bb_webhook',PRECONFIGURED_WEBHOOK);
