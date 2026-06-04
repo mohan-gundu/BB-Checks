@@ -854,7 +854,7 @@ function toDateKey(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),5000);}
 
 // MASTER CLOUD SYSTEM WEBHOOK
-const PRECONFIGURED_WEBHOOK = 'https://script.google.com/macros/s/AKfycbzjmW-M45t7KV8scT1aP02qqb7mKLZc-5NCkIO4OP5F50yf5_ONxlkmENegUquft1q/exec';
+const PRECONFIGURED_WEBHOOK = 'https://script.google.com/macros/s/AKfycbzjmW-M45t7KV8scT1aP02qqb7mKLZc-5NCkIO4OP5F50yf5_ONxlkmENegUquftt1q/exec';
 
 window.addEventListener('load',()=>{
   if(!localStorage.getItem('bb_webhook')&&PRECONFIGURED_WEBHOOK)localStorage.setItem('bb_webhook',PRECONFIGURED_WEBHOOK);
