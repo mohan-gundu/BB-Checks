@@ -581,11 +581,11 @@ function processTemperatureInputGuard(name, val, min, max, inputElement) {
     showToast("❌ Enter a clean numeric value"); inputElement.value = ''; wipeTemperatureEntryDirectly(name); return;
   }
   if (numericTemp < min || numericTemp > max) {
-    const choiceConfirm = confirm("Are you sure?");
+    const choiceConfirm = confirm("This is outside the expected range. Are you sure?");
     if (!choiceConfirm) {
       inputElement.value = ''; wipeTemperatureEntryDirectly(name); return;
     } else {
-      alert("You should flag this to your manager");
+      alert("Please flag this to your manager");
     }
   }
   setTemp(name, val, min, max);
