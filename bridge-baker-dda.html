@@ -188,6 +188,7 @@ input[type="file"].photo-input{display:none;}
 </head>
 <body>
 
+<!-- LOGIN -->
 <div id="screen-login" class="screen active">
   <div class="login-logo">
     <div class="logo-title">Bridge <span class="logo-orange">Baker</span></div>
@@ -213,6 +214,7 @@ input[type="file"].photo-input{display:none;}
   </div>
 </div>
 
+<!-- HOME -->
 <div id="screen-home" class="screen">
   <div class="header">
     <div style="flex:1">
@@ -235,6 +237,7 @@ input[type="file"].photo-input{display:none;}
   <div class="checklist-list" id="checklist-menu"></div>
 </div>
 
+<!-- CHECKLIST -->
 <div id="screen-checklist" class="screen">
   <div class="header">
     <button class="header-back" onclick="showScreen('screen-home')">‹</button>
@@ -247,6 +250,7 @@ input[type="file"].photo-input{display:none;}
   </div>
 </div>
 
+<!-- AUDIT / COMPLIANCE MATRIX -->
 <div id="screen-audit" class="screen">
   <div class="header">
     <button class="header-back" id="audit-back-btn" onclick="showScreen('screen-home')">‹</button>
@@ -261,6 +265,7 @@ input[type="file"].photo-input{display:none;}
   <div class="audit-list" id="audit-list"></div>
 </div>
 
+<!-- CUSTOM HISTORIC CALENDAR PICKER MODAL LAYER -->
 <div class="cal-modal" id="cal-modal" style="display:none;" onclick="if(event.target.id==='cal-modal') closeCalendarPickerModal();">
   <div class="cal-box">
     <div class="cal-header">
@@ -271,6 +276,7 @@ input[type="file"].photo-input{display:none;}
   </div>
 </div>
 
+<!-- FLAG MODAL -->
 <div class="modal-overlay" id="modal" style="display:none" onclick="closeModalBg(event)">
   <div class="modal">
     <h3 id="modal-title">Flag an issue</h3>
@@ -283,6 +289,7 @@ input[type="file"].photo-input{display:none;}
   </div>
 </div>
 
+<!-- LIGHTBOX -->
 <div class="lightbox" id="lightbox" style="display:none" onclick="hideLightbox()">
   <button class="lightbox-close" onclick="hideLightbox()">✕</button>
   <img id="lightbox-img" src="" alt="Evidence photo" />
@@ -293,25 +300,24 @@ input[type="file"].photo-input{display:none;}
 <script>
 let CHECKLISTS = [];
 let STAFF_ROSTER = [];
-let LOGGED_DATES = []; // Dynamic unique historical keys pulled down straight from Sheet1
+let LOGGED_DATES = []; 
 
 let currentUser = {name:'',store:'',role:''};
 let currentChecklist = null;
 let taskStates = {};
 let flagTarget = null;
 let auditFilter = 'all';
-let auditSelectedDate = ''; // Active date parameter tracking for compliance board calculations
+let auditSelectedDate = ''; 
 
 function getRecords(){try{return JSON.parse(localStorage.getItem('bb_records')||'[]');}catch{return[];}}
 function saveRecord(rec){const r=getRecords();r.unshift(rec);localStorage.setItem('bb_records',JSON.stringify(r.slice(0,300)));}
 function getWebhook(){return localStorage.getItem('bb_webhook')||'';}
 
-// MANAGER DROP-BYPASS WATCHER
 function checkManagerRosterBypass(val) {
   const matched = STAFF_ROSTER.find(u => u.displayAs.toLowerCase() === val.trim().toLowerCase());
   const rowField = document.getElementById('store-dropdown-field');
   if (matched && matched.role === 'manager') {
-    rowField.style.display = 'none'; // Lockout dropdown element visibility seamlessly
+    rowField.style.display = 'none'; 
   } else {
     rowField.style.display = 'block';
   }
@@ -358,7 +364,7 @@ function doLogin(){
       return;
     }
     currentUser = { name: matchedUser.displayAs, store: 'All Stores', role: matchedUser.role };
-    auditSelectedDate = toDateKey(new Date()); // Initialize parameter target directly to today
+    auditSelectedDate = toDateKey(new Date()); 
     document.getElementById('audit-back-btn').style.display = 'none';
     document.getElementById('manager-signout-btn').style.display = 'block';
     showScreen('screen-audit');
@@ -378,7 +384,7 @@ function doLogout(){
   currentUser = {name:'',store:'',role:''};
   document.getElementById('login-name').value = ''; 
   document.getElementById('login-store').value = '';
-  document.getElementById('store-dropdown-field').style.display = 'block'; // Reset visual properties
+  document.getElementById('store-dropdown-field').style.display = 'block'; 
   showScreen('screen-login');
 }
 
@@ -565,7 +571,7 @@ function renderTaskList(){
   updateBanner();
 }
 
-// TEMPERATURE DEBOUNCE EVALUATION BOX
+/* REDESIGNED VERIFICATION ROUTER: Shortened confirmation alert loop structure with acknowledgement step */
 function processTemperatureInputGuard(name, val, min, max, inputElement) {
   if (val.trim() === '') {
     wipeTemperatureEntryDirectly(name); inputElement.value = ''; return;
@@ -575,9 +581,11 @@ function processTemperatureInputGuard(name, val, min, max, inputElement) {
     showToast("❌ Enter a clean numeric value"); inputElement.value = ''; wipeTemperatureEntryDirectly(name); return;
   }
   if (numericTemp < min || numericTemp > max) {
-    const choiceConfirm = confirm(`⚠️ ALERT: Entered reading (${numericTemp}°C) falls completely outside expected parameters (${min} to ${max}°C).\n\nAre you sure you want to log this threshold violation?`);
+    const choiceConfirm = confirm("Are you sure?");
     if (!choiceConfirm) {
       inputElement.value = ''; wipeTemperatureEntryDirectly(name); return;
+    } else {
+      alert("You should flag this to your manager");
     }
   }
   setTemp(name, val, min, max);
@@ -651,7 +659,6 @@ function compressImage(base64Str) {
 function removePhoto(taskName){ taskStates[taskName].photo=null; renderTaskList(); }
 function showLightbox(taskName){ showLightboxSrc(taskStates[taskName].photo); }
 
-// UPGRADED ENFORCEMENT: Enforces temperature number tracking check to complete line cards
 function isTaskComplete(task){
   const s=taskStates[task.name]; if(s.status==='pending') return false;
   if(task.type==='temp' && (s.temp === undefined || s.temp.trim() === '')) return false;
@@ -715,7 +722,6 @@ function confirmFlag(){
   hideModal(); renderTaskList(); showToast('⚠ Issue flagged');
 }
 
-// ── CUSTOM DIGITAL CALENDAR POPUP GRAPHICS ENGINE ──────────────────────
 function openCalendarPickerModal() {
   const modal = document.getElementById('cal-modal');
   const targetGrid = document.getElementById('cal-grid-target');
@@ -725,17 +731,14 @@ function openCalendarPickerModal() {
   title.textContent = now.toLocaleString('en-GB', { month: 'long', year: 'numeric' }) + " Logs";
   targetGrid.innerHTML = '';
   
-  // Render Day Labels
   const labels = ['Su','Mo','Tu','We','Th','Fr','Sa'];
   labels.forEach(l => { targetGrid.innerHTML += `<div class="cal-day-lbl">${l}</div>`; });
   
   const firstDayIndex = new Date(now.getFullYear(), now.getMonth(), 1).getDay();
   const totalDaysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
   
-  // Padding cells
   for (let i = 0; i < firstDayIndex; i++) { targetGrid.innerHTML += `<div></div>`; }
   
-  // Build calendar matrix day selections loops
   for (let day = 1; day <= totalDaysInMonth; day++) {
     const curDate = new Date(now.getFullYear(), now.getMonth(), day);
     const dateKeyStr = toDateKey(curDate);
@@ -759,7 +762,6 @@ function handleCalendarDateClick(dateKey) {
   showToast(`📅 Fetching cross-store matrix logs for ${dateKey}...`);
   auditSelectedDate = dateKey;
   
-  // Dynamic fetch execution loop pulling fresh data rows down from cloud for history calculations
   const url = getWebhook();
   if (url) {
     const callbackName = 'bb_hist_' + Date.now();
@@ -782,14 +784,22 @@ function resetAuditDateToToday() {
   auditSelectedDate = toDateKey(new Date()); renderAudit();
 }
 
-// REDESIGNED MULTI-STORE ACCOUNTABILITY AUDIT GRID VIEW
+/* CUSTOM STRING TOKENIZER: Converts standard yyyy-MM-dd into cleaner 4 Jun 2026 presentation formats */
+function formatToHumanDate(dateStr) {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return dateStr;
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return parseInt(parts[2], 10) + ' ' + months[parseInt(parts[1], 10) - 1] + ' ' + parts[0];
+}
+
 function renderAudit(){
   const records = getRecords();
   const stores = ['124 WBR', '811 Fulham Rd', '101 Olympia'];
   
-  // Format visual layout tags to map top metrics
   const isToday = auditSelectedDate === toDateKey(new Date());
-  document.getElementById('matrix-date-badge').textContent = isToday ? "📅 Today" : `📅 ${auditSelectedDate}`;
+  // Integrated human readable custom parsing logic strictly onto the target text node label below
+  document.getElementById('matrix-date-badge').textContent = isToday ? "📅 Today" : `📅 ${formatToHumanDate(auditSelectedDate)}`;
   document.getElementById('return-today-shortcut').style.display = isToday ? 'none' : 'block';
 
   const filtersDiv = document.getElementById('audit-filters');
@@ -855,7 +865,6 @@ function hideLightbox(){document.getElementById('lightbox').style.display='none'
 function toDateKey(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),5000);}
 
-// MASTER WEBHOOK CONSTANT DESTINATION LINK
 const PRECONFIGURED_WEBHOOK = 'https://script.google.com/macros/s/AKfycbzjmW-M45t7KV8scT1aP02qqb7mKLZc-5NCkIO4OP5F50yf5_ONxlkmENegUquftt1q/exec';
 
 window.addEventListener('load',()=>{
