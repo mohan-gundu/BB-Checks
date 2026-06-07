@@ -188,7 +188,6 @@ input[type="file"].photo-input{display:none;}
 </head>
 <body>
 
-<!-- LOGIN -->
 <div id="screen-login" class="screen active">
   <div class="login-logo">
     <div class="logo-title">Bridge <span class="logo-orange">Baker</span></div>
@@ -214,7 +213,6 @@ input[type="file"].photo-input{display:none;}
   </div>
 </div>
 
-<!-- HOME -->
 <div id="screen-home" class="screen">
   <div class="header">
     <div style="flex:1">
@@ -239,7 +237,6 @@ input[type="file"].photo-input{display:none;}
   <div class="checklist-list" id="checklist-menu"></div>
 </div>
 
-<!-- CHECKLIST -->
 <div id="screen-checklist" class="screen">
   <div class="header">
     <button class="header-back" onclick="showScreen('screen-home')">‹</button>
@@ -252,7 +249,6 @@ input[type="file"].photo-input{display:none;}
   </div>
 </div>
 
-<!-- AUDIT / COMPLIANCE MATRIX -->
 <div id="screen-audit" class="screen">
   <div class="header">
     <button class="header-back" id="audit-back-btn" onclick="showScreen('screen-home')">‹</button>
@@ -268,7 +264,6 @@ input[type="file"].photo-input{display:none;}
   <div class="audit-list" id="audit-list"></div>
 </div>
 
-<!-- CUSTOM HISTORIC CALENDAR PICKER MODAL LAYER -->
 <div class="cal-modal" id="cal-modal" style="display:none;" onclick="if(event.target.id==='cal-modal') closeCalendarPickerModal();">
   <div class="cal-box">
     <div class="cal-header">
@@ -279,7 +274,6 @@ input[type="file"].photo-input{display:none;}
   </div>
 </div>
 
-<!-- FLAG MODAL -->
 <div class="modal-overlay" id="modal" style="display:none" onclick="closeModalBg(event)">
   <div class="modal">
     <h3 id="modal-title">Flag an issue</h3>
@@ -292,7 +286,6 @@ input[type="file"].photo-input{display:none;}
   </div>
 </div>
 
-<!-- LIGHTBOX -->
 <div class="lightbox" id="lightbox" style="display:none" onclick="hideLightbox()">
   <button class="lightbox-close" onclick="hideLightbox()">✕</button>
   <img id="lightbox-img" src="" alt="Evidence photo" />
@@ -936,7 +929,7 @@ function hideLightbox(){document.getElementById('lightbox').style.display='none'
 function toDateKey(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),5000);}
 
-const PRECONFIGURED_WEBHOOK = 'https://script.google.com/macros/s/AKfycbzjmW-M45t7KV8scT1aP02qqb7mKLZc-5NCkIO4OP5F50yf5_ONxlkmENegUquftt1q/exec';
+const PRECONFIGURED_WEBHOOK = 'https://script.google.com/macros/s/AKfycbzjmW-M45t7KV8scT1aP02qqb7mKLZc-5NCkIO4OP5F50yf5_ONxlkmENegUquft1q/exec';
 
 window.addEventListener('load',()=>{
   if(!localStorage.getItem('bb_webhook')&&PRECONFIGURED_WEBHOOK)localStorage.setItem('bb_webhook',PRECONFIGURED_WEBHOOK);
