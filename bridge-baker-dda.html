@@ -188,7 +188,6 @@ input[type="file"].photo-input{display:none;}
 </head>
 <body>
 
-<!-- LOGIN -->
 <div id="screen-login" class="screen active">
   <div class="login-logo">
     <div class="logo-title">Bridge <span class="logo-orange">Baker</span></div>
@@ -214,7 +213,6 @@ input[type="file"].photo-input{display:none;}
   </div>
 </div>
 
-<!-- HOME -->
 <div id="screen-home" class="screen">
   <div class="header">
     <div style="flex:1">
@@ -235,12 +233,10 @@ input[type="file"].photo-input{display:none;}
   </div>
   
   <div class="section-title">Checklists</div>
-  <!-- New Multi-Department filter row selector for cross-trained staff layout -->
   <div class="audit-filters" id="home-dept-filters" style="padding: 0 16px 8px; display: none;"></div>
   <div class="checklist-list" id="checklist-menu"></div>
 </div>
 
-<!-- CHECKLIST -->
 <div id="screen-checklist" class="screen">
   <div class="header">
     <button class="header-back" onclick="showScreen('screen-home')">‹</button>
@@ -253,7 +249,6 @@ input[type="file"].photo-input{display:none;}
   </div>
 </div>
 
-<!-- AUDIT / COMPLIANCE MATRIX -->
 <div id="screen-audit" class="screen">
   <div class="header">
     <button class="header-back" id="audit-back-btn" onclick="showScreen('screen-home')">‹</button>
@@ -264,14 +259,11 @@ input[type="file"].photo-input{display:none;}
     <button class="header-back" id="return-today-shortcut" style="display:none; font-size:12px; background:var(--orange); padding:4px 10px; border-radius:6px; color:white; font-weight:bold; margin-right:8px;" onclick="resetAuditDateToToday()">Today</button>
     <button class="header-btn" id="manager-signout-btn" style="display:none;" onclick="doLogout()">Sign out</button>
   </div>
-  <!-- Primary Store Track filter pills -->
   <div class="audit-filters" id="audit-filters"></div>
-  <!-- Option 1: New Secondary Department Sub-Filter Track pills container -->
   <div class="audit-filters" id="audit-dept-filters" style="padding: 0 16px 12px; margin-top: -6px;"></div>
   <div class="audit-list" id="audit-list"></div>
 </div>
 
-<!-- CUSTOM HISTORIC CALENDAR PICKER MODAL LAYER -->
 <div class="cal-modal" id="cal-modal" style="display:none;" onclick="if(event.target.id==='cal-modal') closeCalendarPickerModal();">
   <div class="cal-box">
     <div class="cal-header">
@@ -282,7 +274,6 @@ input[type="file"].photo-input{display:none;}
   </div>
 </div>
 
-<!-- FLAG MODAL -->
 <div class="modal-overlay" id="modal" style="display:none" onclick="closeModalBg(event)">
   <div class="modal">
     <h3 id="modal-title">Flag an issue</h3>
@@ -295,7 +286,6 @@ input[type="file"].photo-input{display:none;}
   </div>
 </div>
 
-<!-- LIGHTBOX -->
 <div class="lightbox" id="lightbox" style="display:none" onclick="hideLightbox()">
   <button class="lightbox-close" onclick="hideLightbox()">✕</button>
   <img id="lightbox-img" src="" alt="Evidence photo" />
@@ -313,9 +303,9 @@ let currentChecklist = null;
 let taskStates = {};
 let flagTarget = null;
 let auditFilter = 'all';
-let auditDeptFilter = 'all'; // New tracking state parameter for Option 1 compliance filter arrays
+let auditDeptFilter = 'all'; 
 let auditSelectedDate = ''; 
-let currentHomeDeptFilter = ''; // Staff dashboard toggle tracker state
+let currentHomeDeptFilter = ''; 
 
 function getRecords(){try{return JSON.parse(localStorage.getItem('bb_records')||'[]');}catch{return[];}}
 function saveRecord(rec){const r=getRecords();r.unshift(rec);localStorage.setItem('bb_records',JSON.stringify(r.slice(0,300)));}
@@ -373,7 +363,7 @@ function doLogin(){
     }
     currentUser = { name: matchedUser.displayAs, store: 'All Stores', role: matchedUser.role, departments: matchedUser.departments || [] };
     auditSelectedDate = toDateKey(new Date()); 
-    auditDeptFilter = 'all'; // Initialize compliance track selectors cleanly
+    auditDeptFilter = 'all'; 
     document.getElementById('audit-back-btn').style.display = 'none';
     document.getElementById('manager-signout-btn').style.display = 'block';
     showScreen('screen-audit');
@@ -383,7 +373,6 @@ function doLogin(){
   if(!store){showToast('Please select a store');return;}
   currentUser = { name: matchedUser.displayAs, store: store, role: matchedUser.role, departments: matchedUser.departments || [] };
   
-  // Set default homepage department filters for standard employees based on permission matrix configurations
   if (currentUser.departments && currentUser.departments.length > 0) {
     currentHomeDeptFilter = currentUser.departments[0];
   } else {
@@ -405,8 +394,11 @@ function doLogout(){
   showScreen('screen-login');
 }
 
+/* REFACTORED: Direct target time-jump evaluation using absolute total values */
 function jumpToDueNow() {
-  const now = new Date(); const nowH = now.getHours(); const todayKey = toDateKey(now);
+  const now = new Date(); 
+  const nowMin = now.getHours() * 60 + now.getMinutes(); 
+  const todayKey = toDateKey(now);
   const recs = getRecords().filter(r => r.store === currentUser.store && r.date === todayKey);
 
   function getMergedState(clId, tasks){
@@ -418,12 +410,11 @@ function jumpToDueNow() {
     return merged;
   }
   for (let cl of CHECKLISTS) {
-    // Enforcement check block boundaries map out role criteria assignments securely
     if (currentHomeDeptFilter && cl.department !== currentHomeDeptFilter) continue;
     
     const merged = getMergedState(cl.id, cl.tasks);
     const allDone = Object.values(merged).every(s => s !== 'pending');
-    if (!allDone && nowH >= cl.dueHour) { openChecklist(cl.id); return; }
+    if (!allDone && nowMin >= cl.dueMinutes) { openChecklist(cl.id); return; }
   }
   showToast("🎉 No pending checklists due right now!");
 }
@@ -469,13 +460,13 @@ function setHomeDeptFilter(dept) {
   renderHome();
 }
 
+/* REFACTORED: Evaluates shift overview calculations by minutes since midnight */
 function renderHome(){
   document.getElementById('home-name').textContent=currentUser.name;
   document.getElementById('home-store-label').textContent=currentUser.store;
   const now=new Date(); document.getElementById('home-date').textContent=now.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'});
   const todayKey=toDateKey(now); const recs=getRecords().filter(r=>r.store===currentUser.store&&r.date===todayKey);
 
-  // Dynamic Toggle Pills layout rendering context block built for multi department crew members
   const deptFilterRow = document.getElementById('home-dept-filters');
   if (currentUser.departments && currentUser.departments.length > 1) {
     deptFilterRow.style.display = 'flex';
@@ -494,10 +485,9 @@ function renderHome(){
   }
 
   let totalDone=0,flagCount=0,dueCount=0;
-  const nowH=now.getHours();
+  const nowMin = now.getHours() * 60 + now.getMinutes();
 
   CHECKLISTS.forEach(cl=>{
-    // Dynamic Filter Constraint check handles hidden lists logic cleanly
     if (currentUser.role !== 'manager' && currentHomeDeptFilter && cl.department !== currentHomeDeptFilter) return;
 
     const merged=getMergedState(cl.id,cl.tasks);
@@ -506,7 +496,7 @@ function renderHome(){
     if(recs.some(r=>r.checklistId===cl.id&&r.hasFlag)) flagCount++;
 
     const allDone=Object.values(merged).every(s=>s!=='pending');
-    if(!allDone&&nowH>=cl.dueHour) dueCount++;
+    if(!allDone&&nowMin >= cl.dueMinutes) dueCount++;
   });
 
   document.getElementById('stat-done').textContent=totalDone;
@@ -519,10 +509,19 @@ function renderHome(){
 
     const merged=getMergedState(cl.id,cl.tasks); const completedCount=Object.values(merged).filter(s=>s!=='pending').length;
     const allDone=completedCount===cl.tasks.length; const hasSaves=recs.some(r=>r.checklistId===cl.id); const flagged=recs.some(r=>r.checklistId===cl.id&&r.hasFlag);
-    const overdue=!allDone&&nowH>cl.dueHourEnd; const due=!allDone&&nowH>=cl.dueHour&&!overdue;
+    
+    // Dynamic runtime comparison loop evaluating time properties safely
+    const overdue=!allDone&&nowMin > cl.dueEndMinutes; 
+    const due=!allDone&&nowMin >= cl.dueMinutes && !overdue;
+    
     const total=cl.tasks.length; const pct=allDone?100:Math.round(completedCount/total*100);
     let st='',sc='';
-    if(allDone&&flagged){st='⚠ Done with flags';sc='overdue';} else if(allDone){st='✓ Complete';sc='done';} else if(overdue){st='● Overdue';sc='overdue';} else if(due){st='● Due now';sc='due';} else{st=`Due ${cl.dueHour}:00`;sc='';}
+    if(allDone&&flagged){st='⚠ Done with flags';sc='overdue';} 
+    else if(allDone){st='✓ Complete';sc='done';} 
+    else if(overdue){st='● Overdue';sc='overdue';} 
+    else if(due){st='● Due now';sc='due';} 
+    else{st=`Due ${cl.dueTimeLabel}`;sc='';}
+    
     menu.innerHTML+=`<div class="checklist-item${due||overdue?' has-orange':''}" onclick="openChecklist('${cl.id}')">
       <div class="checklist-icon" style="background:${cl.color}">${cl.icon}</div>
       <div class="checklist-info">
@@ -838,7 +837,6 @@ function setAuditDeptFilter(dept) {
   renderAudit();
 }
 
-// OPTION 1 MATRIX ENGINE: Renders separate, clean dual-filter tracks
 function renderAudit(){
   const records = getRecords();
   const stores = ['124 WBR', '811 Fulham Rd', '101 Olympia'];
@@ -847,13 +845,11 @@ function renderAudit(){
   document.getElementById('matrix-date-badge').textContent = isToday ? "📅 Today" : `📅 ${formatToHumanDate(auditSelectedDate)}`;
   document.getElementById('return-today-shortcut').style.display = isToday ? 'none' : 'block';
 
-  // Render Top Level Store Track
   const filtersDiv = document.getElementById('audit-filters');
   filtersDiv.innerHTML = ['all', ...stores].map(s => `
     <div class="filter-chip ${auditFilter===s?'active':''}" onclick="setAuditFilter('${s}')">${s==='all'?'All Stores':s}</div>
   `).join('');
 
-  // Extract unique custom Department configurations currently inside active rules to map track 2
   const uniqueDepartments = [...new Set(CHECKLISTS.map(cl => cl.department))].filter(Boolean);
   const deptFiltersDiv = document.getElementById('audit-dept-filters');
   deptFiltersDiv.innerHTML = ['all', ...uniqueDepartments].map(d => `
@@ -867,7 +863,6 @@ function renderAudit(){
     let checklistsHtml = '';
     
     CHECKLISTS.forEach(cl => {
-      // Option 1 Filter Isolation Guard Clause: Prevents screen crowding automatically
       if (auditDeptFilter !== 'all' && cl.department !== auditDeptFilter) return;
 
       const clSaves = records.filter(r => r.store === store && r.date === auditSelectedDate && r.checklistId === cl.id);
