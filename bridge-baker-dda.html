@@ -188,6 +188,7 @@ input[type="file"].photo-input{display:none;}
 </head>
 <body>
 
+<!-- LOGIN -->
 <div id="screen-login" class="screen active">
   <div class="login-logo">
     <div class="logo-title">Bridge <span class="logo-orange">Baker</span></div>
@@ -213,6 +214,7 @@ input[type="file"].photo-input{display:none;}
   </div>
 </div>
 
+<!-- HOME -->
 <div id="screen-home" class="screen">
   <div class="header">
     <div style="flex:1">
@@ -237,6 +239,7 @@ input[type="file"].photo-input{display:none;}
   <div class="checklist-list" id="checklist-menu"></div>
 </div>
 
+<!-- CHECKLIST -->
 <div id="screen-checklist" class="screen">
   <div class="header">
     <button class="header-back" onclick="showScreen('screen-home')">‹</button>
@@ -249,6 +252,7 @@ input[type="file"].photo-input{display:none;}
   </div>
 </div>
 
+<!-- AUDIT / COMPLIANCE MATRIX -->
 <div id="screen-audit" class="screen">
   <div class="header">
     <button class="header-back" id="audit-back-btn" onclick="showScreen('screen-home')">‹</button>
@@ -264,6 +268,7 @@ input[type="file"].photo-input{display:none;}
   <div class="audit-list" id="audit-list"></div>
 </div>
 
+<!-- CUSTOM HISTORIC CALENDAR PICKER MODAL LAYER -->
 <div class="cal-modal" id="cal-modal" style="display:none;" onclick="if(event.target.id==='cal-modal') closeCalendarPickerModal();">
   <div class="cal-box">
     <div class="cal-header">
@@ -274,6 +279,7 @@ input[type="file"].photo-input{display:none;}
   </div>
 </div>
 
+<!-- FLAG MODAL -->
 <div class="modal-overlay" id="modal" style="display:none" onclick="closeModalBg(event)">
   <div class="modal">
     <h3 id="modal-title">Flag an issue</h3>
@@ -286,6 +292,7 @@ input[type="file"].photo-input{display:none;}
   </div>
 </div>
 
+<!-- LIGHTBOX -->
 <div class="lightbox" id="lightbox" style="display:none" onclick="hideLightbox()">
   <button class="lightbox-close" onclick="hideLightbox()">✕</button>
   <img id="lightbox-img" src="" alt="Evidence photo" />
@@ -394,7 +401,6 @@ function doLogout(){
   showScreen('screen-login');
 }
 
-/* UPGRADED DUAL-FILTER GATEWAY: Evaluates half-hour matrices alongside strict user-store parameters */
 function jumpToDueNow() {
   const now = new Date(); 
   const nowMin = now.getHours() * 60 + now.getMinutes(); 
@@ -411,7 +417,7 @@ function jumpToDueNow() {
   }
   for (let cl of CHECKLISTS) {
     if (currentHomeDeptFilter && cl.department !== currentHomeDeptFilter) continue;
-    if (cl.store !== 'All' && cl.store !== currentUser.store) continue; // New validation gate
+    if (cl.store !== 'All' && cl.store !== currentUser.store) continue; 
     
     const merged = getMergedState(cl.id, cl.tasks);
     const allDone = Object.values(merged).every(s => s !== 'pending');
@@ -461,7 +467,6 @@ function setHomeDeptFilter(dept) {
   renderHome();
 }
 
-/* UPGRADED DUAL-FILTER GATEWAY: Filters user views strictly by Store + Department variables simultaneously */
 function renderHome(){
   document.getElementById('home-name').textContent=currentUser.name;
   document.getElementById('home-store-label').textContent=currentUser.store;
@@ -491,7 +496,7 @@ function renderHome(){
   CHECKLISTS.forEach(cl=>{
     if (currentUser.role !== 'manager') {
       if (currentHomeDeptFilter && cl.department !== currentHomeDeptFilter) return;
-      if (cl.store !== 'All' && cl.store !== currentUser.store) return; // Strict physical branch filter block
+      if (cl.store !== 'All' && cl.store !== currentUser.store) return; 
     }
 
     const merged=getMergedState(cl.id,cl.tasks);
@@ -589,7 +594,7 @@ function renderTaskList(){
     }
 
     let photoHtml='';
-    if(photoHtml=task.requirePhoto){
+    if(task.requirePhoto){
       photoHtml=`<div class="photo-section">
         <div class="photo-label">Evidence photo <span class="req-badge">REQUIRED</span></div>
         ${s.photo
@@ -843,7 +848,6 @@ function setAuditDeptFilter(dept) {
   renderAudit();
 }
 
-/* UPGRADED MATRIX ENGINE: Isolates checklists down to unique Store + Department parameters smoothly */
 function renderAudit(){
   const records = getRecords();
   const stores = ['124 WBR', '811 Fulham Rd', '101 Olympia'];
@@ -871,7 +875,7 @@ function renderAudit(){
     
     CHECKLISTS.forEach(cl => {
       if (auditDeptFilter !== 'all' && cl.department !== auditDeptFilter) return;
-      if (cl.store !== 'All' && cl.store !== store) return; // Restricts layout rendering to the correct specific store target block row
+      if (cl.store !== 'All' && cl.store !== store) return; 
 
       const clSaves = records.filter(r => r.store === store && r.date === auditSelectedDate && r.checklistId === cl.id);
       let taskMap = {};
