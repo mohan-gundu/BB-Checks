@@ -394,7 +394,7 @@ function doLogout(){
   showScreen('screen-login');
 }
 
-/* REFACTORED: Direct target time-jump evaluation using absolute total values */
+/* UPGRADED DUAL-FILTER GATEWAY: Evaluates half-hour matrices alongside strict user-store parameters */
 function jumpToDueNow() {
   const now = new Date(); 
   const nowMin = now.getHours() * 60 + now.getMinutes(); 
@@ -411,6 +411,7 @@ function jumpToDueNow() {
   }
   for (let cl of CHECKLISTS) {
     if (currentHomeDeptFilter && cl.department !== currentHomeDeptFilter) continue;
+    if (cl.store !== 'All' && cl.store !== currentUser.store) continue; // New validation gate
     
     const merged = getMergedState(cl.id, cl.tasks);
     const allDone = Object.values(merged).every(s => s !== 'pending');
@@ -460,7 +461,7 @@ function setHomeDeptFilter(dept) {
   renderHome();
 }
 
-/* REFACTORED: Evaluates shift overview calculations by minutes since midnight */
+/* UPGRADED DUAL-FILTER GATEWAY: Filters user views strictly by Store + Department variables simultaneously */
 function renderHome(){
   document.getElementById('home-name').textContent=currentUser.name;
   document.getElementById('home-store-label').textContent=currentUser.store;
@@ -488,7 +489,10 @@ function renderHome(){
   const nowMin = now.getHours() * 60 + now.getMinutes();
 
   CHECKLISTS.forEach(cl=>{
-    if (currentUser.role !== 'manager' && currentHomeDeptFilter && cl.department !== currentHomeDeptFilter) return;
+    if (currentUser.role !== 'manager') {
+      if (currentHomeDeptFilter && cl.department !== currentHomeDeptFilter) return;
+      if (cl.store !== 'All' && cl.store !== currentUser.store) return; // Strict physical branch filter block
+    }
 
     const merged=getMergedState(cl.id,cl.tasks);
     const completedCount=Object.values(merged).filter(s=>s!=='pending').length;
@@ -505,12 +509,14 @@ function renderHome(){
   
   const menu=document.getElementById('checklist-menu'); menu.innerHTML='';
   CHECKLISTS.forEach(cl=>{
-    if (currentUser.role !== 'manager' && currentHomeDeptFilter && cl.department !== currentHomeDeptFilter) return;
+    if (currentUser.role !== 'manager') {
+      if (currentHomeDeptFilter && cl.department !== currentHomeDeptFilter) return;
+      if (cl.store !== 'All' && cl.store !== currentUser.store) return;
+    }
 
     const merged=getMergedState(cl.id,cl.tasks); const completedCount=Object.values(merged).filter(s=>s!=='pending').length;
     const allDone=completedCount===cl.tasks.length; const hasSaves=recs.some(r=>r.checklistId===cl.id); const flagged=recs.some(r=>r.checklistId===cl.id&&r.hasFlag);
     
-    // Dynamic runtime comparison loop evaluating time properties safely
     const overdue=!allDone&&nowMin > cl.dueEndMinutes; 
     const due=!allDone&&nowMin >= cl.dueMinutes && !overdue;
     
@@ -583,7 +589,7 @@ function renderTaskList(){
     }
 
     let photoHtml='';
-    if(task.requirePhoto){
+    if(photoHtml=task.requirePhoto){
       photoHtml=`<div class="photo-section">
         <div class="photo-label">Evidence photo <span class="req-badge">REQUIRED</span></div>
         ${s.photo
@@ -837,6 +843,7 @@ function setAuditDeptFilter(dept) {
   renderAudit();
 }
 
+/* UPGRADED MATRIX ENGINE: Isolates checklists down to unique Store + Department parameters smoothly */
 function renderAudit(){
   const records = getRecords();
   const stores = ['124 WBR', '811 Fulham Rd', '101 Olympia'];
@@ -864,6 +871,7 @@ function renderAudit(){
     
     CHECKLISTS.forEach(cl => {
       if (auditDeptFilter !== 'all' && cl.department !== auditDeptFilter) return;
+      if (cl.store !== 'All' && cl.store !== store) return; // Restricts layout rendering to the correct specific store target block row
 
       const clSaves = records.filter(r => r.store === store && r.date === auditSelectedDate && r.checklistId === cl.id);
       let taskMap = {};
@@ -924,7 +932,7 @@ function hideLightbox(){document.getElementById('lightbox').style.display='none'
 function toDateKey(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),5000);}
 
-const PRECONFIGURED_WEBHOOK = 'https://script.google.com/macros/s/AKfycbzjmW-M45t7KV8scT1aP02qqb7mKLZc-5NCkIO4OP5F50yf5_ONxlkmENegUquftt1q/exec';
+const PRECONFIGURED_WEBHOOK = 'https://script.google.com/macros/s/AKfycbzjmW-M45t7KV8scT1aP02qqb7mKLZc-5NCkIO4OP5F50yf5_ONxlkmENegUquft1q/exec';
 
 window.addEventListener('load',()=>{
   if(!localStorage.getItem('bb_webhook')&&PRECONFIGURED_WEBHOOK)localStorage.setItem('bb_webhook',PRECONFIGURED_WEBHOOK);
