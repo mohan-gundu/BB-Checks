@@ -81,9 +81,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
 /* CHECKLIST MENU */
 .checklist-list{padding:0 16px 28px;display:flex;flex-direction:column;gap:8px;}
-.checklist-item{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-lg);padding:14px 14px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:border-color 0.15s;}
+.checklist-item{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-lg);padding:14px 14px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:border-color 0.15s,opacity 0.15s;}
 .checklist-item:active{background:var(--grey-light);}
 .checklist-item.has-orange{border-left:4px solid var(--orange);}
+.checklist-item.predue{opacity:0.45;}
 .checklist-icon{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;}
 .checklist-info{flex:1;min-width:0;}
 .checklist-info h3{font-size:15px;font-weight:600;color:var(--text);}
@@ -231,7 +232,7 @@ input[type="file"].photo-input{display:none;}
     <div class="stat-card danger" style="cursor:pointer" onclick="jumpToDueNow()"><div class="stat-num" id="stat-due">0</div><div class="stat-label">Due now ↗</div></div>
     <div class="stat-card warn" style="cursor:pointer" onclick="jumpToFlags()"><div class="stat-num" id="stat-flags">0</div><div class="stat-label">Flags ↗</div></div>
   </div>
-  
+
   <div class="section-title">Checklists</div>
   <div class="audit-filters" id="home-dept-filters" style="padding: 0 16px 8px; display: none;"></div>
   <div class="checklist-list" id="checklist-menu"></div>
@@ -296,26 +297,62 @@ input[type="file"].photo-input{display:none;}
 <script>
 let CHECKLISTS = [];
 let STAFF_ROSTER = [];
-let LOGGED_DATES = []; 
+let LOGGED_DATES = [];
 
 let currentUser = {name:'',store:'',role:'',departments:[]};
 let currentChecklist = null;
+let currentVisibleTasks = [];   // tasks visible for the current user+store, set when a checklist is opened
 let taskStates = {};
 let flagTarget = null;
 let auditFilter = 'all';
-let auditDeptFilter = 'all'; 
-let auditSelectedDate = ''; 
-let currentHomeDeptFilter = ''; 
+let auditDeptFilter = 'all';
+let auditSelectedDate = '';
+let currentHomeDeptFilter = '';  // '' = union of all the user's departments
 
 function getRecords(){try{return JSON.parse(localStorage.getItem('bb_records')||'[]');}catch{return[];}}
 function saveRecord(rec){const r=getRecords();r.unshift(rec);localStorage.setItem('bb_records',JSON.stringify(r.slice(0,300)));}
 function getWebhook(){return localStorage.getItem('bb_webhook')||'';}
 
+/* ── Targeting: ONE shared filter that decides which tasks apply ──────────
+   Store and department now live on each task (set per Config row). A blank
+   or "All" cell matches anything. A user whose department list includes
+   "ALL" sees every department. Everything that counts completion routes
+   through visibleTasks() so the home screen, the checklist, submit, and the
+   manager audit can never disagree. */
+function taskMatchesStore(taskStore, store){
+  const ts = String(taskStore||'').trim();
+  if(ts==='' || ts.toLowerCase()==='all') return true;
+  return ts===store;
+}
+function taskMatchesDept(taskDept, departments){
+  const td = String(taskDept||'').trim().toUpperCase();
+  if(td==='' || td==='ALL') return true;               // task open to all departments
+  if(!departments || departments.length===0) return false;
+  if(departments.indexOf('ALL')>-1) return true;       // user belongs to all departments
+  return departments.indexOf(td)>-1;
+}
+function visibleTasks(checklist, store, departments){
+  return checklist.tasks.filter(t => taskMatchesStore(t.store, store) && taskMatchesDept(t.department, departments));
+}
+function effectiveDepartments(){
+  if(currentHomeDeptFilter) return [currentHomeDeptFilter];
+  return (currentUser.departments && currentUser.departments.length) ? currentUser.departments : ['ALL'];
+}
+/* Classify a completion's submission time against the checklist's F/G window. */
+function classifyTiming(timestampISO, dueMin, dueEndMin){
+  if(!timestampISO) return '';
+  const d = new Date(timestampISO);
+  const mins = d.getHours()*60 + d.getMinutes();
+  if(mins < dueMin) return 'early';
+  if(mins > dueEndMin) return 'late';
+  return 'ontime';
+}
+
 function checkManagerRosterBypass(val) {
   const matched = STAFF_ROSTER.find(u => u.displayAs.toLowerCase() === val.trim().toLowerCase());
   const rowField = document.getElementById('store-dropdown-field');
   if (matched && matched.role === 'manager') {
-    rowField.style.display = 'none'; 
+    rowField.style.display = 'none';
   } else {
     rowField.style.display = 'block';
   }
@@ -329,7 +366,7 @@ function showScreen(id){
     renderHome();
     const todayKey=toDateKey(new Date());
     syncFromSheets(currentUser.store,todayKey).then(()=>{
-      renderHome(); 
+      renderHome();
     });
   }
   if(id==='screen-audit') renderAudit();
@@ -346,7 +383,7 @@ function goAudit(){
 function doLogin(){
   const nameInput = document.getElementById('login-name').value.trim();
   const store = document.getElementById('login-store').value;
-  
+
   if(!nameInput){showToast('Please type or select your name');return;}
 
   const matchedUser = STAFF_ROSTER.find(u => u.displayAs.toLowerCase() === nameInput.toLowerCase());
@@ -362,8 +399,8 @@ function doLogin(){
       return;
     }
     currentUser = { name: matchedUser.displayAs, store: 'All Stores', role: matchedUser.role, departments: matchedUser.departments || [] };
-    auditSelectedDate = toDateKey(new Date()); 
-    auditDeptFilter = 'all'; 
+    auditSelectedDate = toDateKey(new Date());
+    auditDeptFilter = 'all';
     document.getElementById('audit-back-btn').style.display = 'none';
     document.getElementById('manager-signout-btn').style.display = 'block';
     showScreen('screen-audit');
@@ -372,13 +409,9 @@ function doLogin(){
 
   if(!store){showToast('Please select a store');return;}
   currentUser = { name: matchedUser.displayAs, store: store, role: matchedUser.role, departments: matchedUser.departments || [] };
-  
-  if (currentUser.departments && currentUser.departments.length > 0) {
-    currentHomeDeptFilter = currentUser.departments[0];
-  } else {
-    currentHomeDeptFilter = '';
-  }
-  
+
+  currentHomeDeptFilter = '';   // default to the union of all their departments
+
   auditSelectedDate = toDateKey(new Date());
   document.getElementById('audit-btn-lockout').style.display = 'none';
   document.getElementById('audit-back-btn').style.display = 'block';
@@ -388,15 +421,16 @@ function doLogin(){
 
 function doLogout(){
   currentUser = {name:'',store:'',role:'',departments:[]};
-  document.getElementById('login-name').value = ''; 
+  currentHomeDeptFilter = '';
+  document.getElementById('login-name').value = '';
   document.getElementById('login-store').value = '';
-  document.getElementById('store-dropdown-field').style.display = 'block'; 
+  document.getElementById('store-dropdown-field').style.display = 'block';
   showScreen('screen-login');
 }
 
 function jumpToDueNow() {
-  const now = new Date(); 
-  const nowMin = now.getHours() * 60 + now.getMinutes(); 
+  const now = new Date();
+  const nowMin = now.getHours() * 60 + now.getMinutes();
   const todayKey = toDateKey(now);
   const recs = getRecords().filter(r => r.store === currentUser.store && r.date === todayKey);
 
@@ -409,10 +443,10 @@ function jumpToDueNow() {
     return merged;
   }
   for (let cl of CHECKLISTS) {
-    if (currentHomeDeptFilter && cl.department !== currentHomeDeptFilter) continue;
-    if (cl.store !== 'All' && cl.store !== currentUser.store) continue; 
-    
-    const merged = getMergedState(cl.id, cl.tasks);
+    const vis = visibleTasks(cl, currentUser.store, effectiveDepartments());
+    if (vis.length === 0) continue;
+
+    const merged = getMergedState(cl.id, vis);
     const allDone = Object.values(merged).every(s => s !== 'pending');
     if (!allDone && nowMin >= cl.dueMinutes) { openChecklist(cl.id); return; }
   }
@@ -420,7 +454,7 @@ function jumpToDueNow() {
 }
 
 function jumpToFlags() {
-  if (currentUser.role === 'manager') { showScreen('screen-audit'); } 
+  if (currentUser.role === 'manager') { showScreen('screen-audit'); }
   else {
     const todayKey = toDateKey(new Date());
     const recs = getRecords().filter(r => r.store === currentUser.store && r.date === todayKey && r.hasFlag);
@@ -437,13 +471,13 @@ async function fetchSystemData() {
     const callbackName = 'bb_init_' + Date.now();
     const script = document.createElement('script');
     script.src = url + '?action=getInitData&callback=' + callbackName;
-    
+
     window[callbackName] = function(payload) {
       if (payload && Array.isArray(payload.checklists)) {
         CHECKLISTS = payload.checklists;
         STAFF_ROSTER = payload.staff || [];
         LOGGED_DATES = payload.loggedDates || [];
-        
+
         const datalist = document.getElementById('staff-list');
         datalist.innerHTML = STAFF_ROSTER.map(person => `<option value="${person.displayAs}">${person.firstName} ${person.lastName} (${person.role})</option>`).join('');
         console.log("Roster configurations processed live on launch.");
@@ -466,15 +500,21 @@ function renderHome(){
   const now=new Date(); document.getElementById('home-date').textContent=now.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'});
   const todayKey=toDateKey(now); const recs=getRecords().filter(r=>r.store===currentUser.store&&r.date===todayKey);
 
+  // Department chips: "All" (union) plus one per department, shown only when
+  // the user belongs to more than one department.
   const deptFilterRow = document.getElementById('home-dept-filters');
   if (currentUser.departments && currentUser.departments.length > 1) {
     deptFilterRow.style.display = 'flex';
-    deptFilterRow.innerHTML = currentUser.departments.map(d => `
+    let chips = `<div class="filter-chip ${currentHomeDeptFilter===''?'active':''}" onclick="setHomeDeptFilter('')">All</div>`;
+    chips += currentUser.departments.map(d => `
       <div class="filter-chip ${currentHomeDeptFilter===d?'active':''}" onclick="setHomeDeptFilter('${d}')">${d}</div>
     `).join('');
+    deptFilterRow.innerHTML = chips;
   } else {
     deptFilterRow.style.display = 'none';
   }
+
+  const depts = effectiveDepartments();
 
   function getMergedState(clId, tasks){
     const saves=recs.filter(r=>r.checklistId===clId); const merged={};
@@ -487,14 +527,12 @@ function renderHome(){
   const nowMin = now.getHours() * 60 + now.getMinutes();
 
   CHECKLISTS.forEach(cl=>{
-    if (currentUser.role !== 'manager') {
-      if (currentHomeDeptFilter && cl.department !== currentHomeDeptFilter) return;
-      if (cl.store !== 'All' && cl.store !== currentUser.store) return; 
-    }
+    const vis = visibleTasks(cl, currentUser.store, depts);
+    if (vis.length === 0) return;
 
-    const merged=getMergedState(cl.id,cl.tasks);
+    const merged=getMergedState(cl.id,vis);
     const completedCount=Object.values(merged).filter(s=>s!=='pending').length;
-    if(completedCount===cl.tasks.length) totalDone++;
+    if(completedCount===vis.length) totalDone++;
     if(recs.some(r=>r.checklistId===cl.id&&r.hasFlag)) flagCount++;
 
     const allDone=Object.values(merged).every(s=>s!=='pending');
@@ -504,29 +542,28 @@ function renderHome(){
   document.getElementById('stat-done').textContent=totalDone;
   document.getElementById('stat-due').textContent=dueCount;
   document.getElementById('stat-flags').textContent=flagCount;
-  
+
   const menu=document.getElementById('checklist-menu'); menu.innerHTML='';
   CHECKLISTS.forEach(cl=>{
-    if (currentUser.role !== 'manager') {
-      if (currentHomeDeptFilter && cl.department !== currentHomeDeptFilter) return;
-      if (cl.store !== 'All' && cl.store !== currentUser.store) return;
-    }
+    const vis = visibleTasks(cl, currentUser.store, depts);
+    if (vis.length === 0) return;
 
-    const merged=getMergedState(cl.id,cl.tasks); const completedCount=Object.values(merged).filter(s=>s!=='pending').length;
-    const allDone=completedCount===cl.tasks.length; const hasSaves=recs.some(r=>r.checklistId===cl.id); const flagged=recs.some(r=>r.checklistId===cl.id&&r.hasFlag);
-    
-    const overdue=!allDone&&nowMin > cl.dueEndMinutes; 
+    const merged=getMergedState(cl.id,vis); const completedCount=Object.values(merged).filter(s=>s!=='pending').length;
+    const allDone=completedCount===vis.length; const hasSaves=recs.some(r=>r.checklistId===cl.id); const flagged=recs.some(r=>r.checklistId===cl.id&&r.hasFlag);
+
+    const predue=nowMin < cl.dueMinutes;
+    const overdue=!allDone&&nowMin > cl.dueEndMinutes;
     const due=!allDone&&nowMin >= cl.dueMinutes && !overdue;
-    
-    const total=cl.tasks.length; const pct=allDone?100:Math.round(completedCount/total*100);
+
+    const total=vis.length; const pct=allDone?100:Math.round(completedCount/total*100);
     let st='',sc='';
-    if(allDone&&flagged){st='⚠ Done with flags';sc='overdue';} 
-    else if(allDone){st='✓ Complete';sc='done';} 
-    else if(overdue){st='● Overdue';sc='overdue';} 
-    else if(due){st='● Due now';sc='due';} 
+    if(allDone&&flagged){st='⚠ Done with flags';sc='overdue';}
+    else if(allDone){st='✓ Complete';sc='done';}
+    else if(overdue){st='● Overdue';sc='overdue';}
+    else if(due){st='● Due now';sc='due';}
     else{st=`Due ${cl.dueTimeLabel}`;sc='';}
-    
-    menu.innerHTML+=`<div class="checklist-item${due||overdue?' has-orange':''}" onclick="openChecklist('${cl.id}')">
+
+    menu.innerHTML+=`<div class="checklist-item${due||overdue?' has-orange':''}${predue?' predue':''}" onclick="openChecklist('${cl.id}')">
       <div class="checklist-icon" style="background:${cl.color}">${cl.icon}</div>
       <div class="checklist-info">
         <h3>${cl.label} <span style="font-size:10px; color:var(--text-muted); font-weight:normal;">(${cl.department})</span></h3>
@@ -540,8 +577,11 @@ function renderHome(){
 }
 
 function openChecklist(id){
-  currentChecklist=CHECKLISTS.find(c=>c.id===id); taskStates={};
-  currentChecklist.tasks.forEach(t=>{taskStates[t.name]={status:'pending',note:'',temp:'',photo:null,signedBy:null,time:null};});
+  currentChecklist=CHECKLISTS.find(c=>c.id===id);
+  // Lock in the tasks visible to this user+store for the whole checklist session.
+  currentVisibleTasks = visibleTasks(currentChecklist, currentUser.store, effectiveDepartments());
+  taskStates={};
+  currentVisibleTasks.forEach(t=>{taskStates[t.name]={status:'pending',note:'',temp:'',photo:null,signedBy:null,time:null};});
   document.getElementById('checklist-title').textContent=currentChecklist.icon+' '+currentChecklist.label;
   document.getElementById('task-list').innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);font-weight:500;">⏳ Syncing latest logs...</div>';
   showScreen('screen-checklist');
@@ -563,7 +603,7 @@ function mergeAndRender(id,todayKey){
 
 function renderTaskList(){
   const list=document.getElementById('task-list'); list.innerHTML='';
-  currentChecklist.tasks.forEach(task=>{
+  currentVisibleTasks.forEach(task=>{
     const s=taskStates[task.name];
     let chkHtml='';
     if(s.status==='ok') chkHtml='<div class="task-check checked">✓</div>';
@@ -577,12 +617,16 @@ function renderTaskList(){
 
     let tempHtml='';
     if(task.type==='temp'){
+      const tempVal = (s.temp===undefined||s.temp===null) ? '' : s.temp;
+      const tempNum = parseFloat(tempVal);
+      const inRange = tempVal!==''&&!isNaN(tempNum)&&tempNum>=task.min&&tempNum<=task.max;
+      const tempStatusTxt = tempVal!=='' ? (inRange?'✓ OK':'✗ Out of range') : '';
       tempHtml=`<div class="temp-row">
-        <input class="temp-input" type="text" value="${s.temp}" placeholder="0"
+        <input class="temp-input" type="text" value="${tempVal}" placeholder="0"
           onchange="processTemperatureInputGuard('${task.name.replace(/'/g, "\\'")}',this.value,${task.min},${task.max},this)" />
         <span class="temp-unit">°C</span>
         <span class="temp-range">Range: ${task.min} to ${task.max}°C</span>
-        <span class="temp-status ${s.temp!==''&&parseFloat(s.temp)>=task.min&&parseFloat(s.temp)<=task.max?'ok':s.temp!==''?'bad':''}" id="ts_${task.name.replace(/\s+/g,'_')}">${s.temp!==''&&parseFloat(s.temp)>=task.min&&parseFloat(s.temp)<=task.max?'✓ OK':s.temp!=='覆'?'✗ Out of range':''}</span>
+        <span class="temp-status ${inRange?'ok':(tempVal!==''?'bad':'')}" id="ts_${task.name.replace(/\s+/g,'_')}">${tempStatusTxt}</span>
       </div>`;
     }
 
@@ -641,7 +685,7 @@ function wipeTemperatureEntryDirectly(name) {
 }
 
 function handleTaskClick(name){
-  const taskDef = currentChecklist.tasks.find(t => t.name === name);
+  const taskDef = currentVisibleTasks.find(t => t.name === name);
   if (taskDef && taskDef.type === 'temp' && taskStates[name].status === 'pending') {
     showToast("🌡️ Please type a numeric reading directly below to confirm this task"); return;
   }
@@ -705,14 +749,14 @@ function showLightbox(taskName){ showLightboxSrc(taskStates[taskName].photo); }
 
 function isTaskComplete(task){
   const s=taskStates[task.name]; if(s.status==='pending') return false;
-  if(task.type==='temp' && (s.temp === undefined || s.temp.trim() === '')) return false;
+  if(task.type==='temp' && (s.temp === undefined || s.temp === null || String(s.temp).trim() === '')) return false;
   if(task.requirePhoto && !s.photo) return false;
   return true;
 }
 
 function updateBanner(){
-  const total=currentChecklist.tasks.length; const done=currentChecklist.tasks.filter(t=>isTaskComplete(t)).length;
-  const photosPending=currentChecklist.tasks.filter(t=>t.requirePhoto&&taskStates[t.name].status!=='pending'&&!taskStates[t.name].photo).length;
+  const total=currentVisibleTasks.length; const done=currentVisibleTasks.filter(t=>isTaskComplete(t)).length;
+  const photosPending=currentVisibleTasks.filter(t=>t.requirePhoto&&taskStates[t.name].status!=='pending'&&!taskStates[t.name].photo).length;
   const allDone=done===total&&photosPending===0;
   let msg=`${done} of ${total} tasks completed`;
   if(photosPending>0) msg+=` — ${photosPending} photo${photosPending>1?'s':''} still needed`;
@@ -722,10 +766,10 @@ function updateBanner(){
 }
 
 function submitChecklist(){
-  const photoMissing=currentChecklist.tasks.filter(t=>t.requirePhoto && taskStates[t.name].status!=='pending' && !taskStates[t.name].photo);
+  const photoMissing=currentVisibleTasks.filter(t=>t.requirePhoto && taskStates[t.name].status!=='pending' && !taskStates[t.name].photo);
   if(photoMissing.length>0){showToast(`📷 Photo required: ${photoMissing[0].name}`);return;}
 
-  const taskArr=currentChecklist.tasks.map(t=>({
+  const taskArr=currentVisibleTasks.map(t=>({
     name:t.name, status:taskStates[t.name].status, note:taskStates[t.name].note, temp:taskStates[t.name].temp, photo:taskStates[t.name].photo||null, hasPhoto:!!taskStates[t.name].photo, signedBy:taskStates[t.name].status!=='pending'?currentUser.name:null
   }));
   const done=taskArr.filter(t=>t.status!=='pending').length; const total=taskArr.length; const allDone=done===total; const hasFlag=taskArr.some(t=>t.status==='flag');
@@ -770,30 +814,30 @@ function openCalendarPickerModal() {
   const modal = document.getElementById('cal-modal');
   const targetGrid = document.getElementById('cal-grid-target');
   const title = document.getElementById('cal-month-title');
-  
+
   const now = new Date();
   title.textContent = now.toLocaleString('en-GB', { month: 'long', year: 'numeric' }) + " Logs";
   targetGrid.innerHTML = '';
-  
+
   const labels = ['Su','Mo','Tu','We','Th','Fr','Sa'];
   labels.forEach(l => { targetGrid.innerHTML += `<div class="cal-day-lbl">${l}</div>`; });
-  
+
   const firstDayIndex = new Date(now.getFullYear(), now.getMonth(), 1).getDay();
   const totalDaysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  
+
   for (let i = 0; i < firstDayIndex; i++) { targetGrid.innerHTML += `<div></div>`; }
-  
+
   for (let day = 1; day <= totalDaysInMonth; day++) {
     const curDate = new Date(now.getFullYear(), now.getMonth(), day);
     const dateKeyStr = toDateKey(curDate);
     const hasData = LOGGED_DATES.includes(dateKeyStr);
     const isToday = dateKeyStr === toDateKey(new Date());
     const isSelected = dateKeyStr === auditSelectedDate;
-    
+
     let cellClass = "cal-cell disabled";
     if (hasData || isToday) cellClass = "cal-cell has-logs";
     if (isSelected) cellClass += " selected-date";
-    
+
     targetGrid.innerHTML += `<div class="${cellClass}" onclick="handleCalendarDateClick('${dateKeyStr}')">${day}</div>`;
   }
   modal.style.display = 'flex';
@@ -805,7 +849,7 @@ function handleCalendarDateClick(dateKey) {
   closeCalendarPickerModal();
   showToast(`📅 Fetching cross-store matrix logs for ${dateKey}...`);
   auditSelectedDate = dateKey;
-  
+
   const url = getWebhook();
   if (url) {
     const callbackName = 'bb_hist_' + Date.now();
@@ -844,7 +888,7 @@ function setAuditDeptFilter(dept) {
 function renderAudit(){
   const records = getRecords();
   const stores = ['124 WBR', '811 Fulham Rd', '101 Olympia'];
-  
+
   const isToday = auditSelectedDate === toDateKey(new Date());
   document.getElementById('matrix-date-badge').textContent = isToday ? "📅 Today" : `📅 ${formatToHumanDate(auditSelectedDate)}`;
   document.getElementById('return-today-shortcut').style.display = isToday ? 'none' : 'block';
@@ -854,7 +898,9 @@ function renderAudit(){
     <div class="filter-chip ${auditFilter===s?'active':''}" onclick="setAuditFilter('${s}')">${s==='all'?'All Stores':s}</div>
   `).join('');
 
-  const uniqueDepartments = [...new Set(CHECKLISTS.map(cl => cl.department))].filter(Boolean);
+  // Department chips derived from the tasks themselves, so departments that
+  // only appear on inner rows still show up.
+  const uniqueDepartments = [...new Set(CHECKLISTS.flatMap(cl => cl.tasks.map(t => String(t.department||'').trim().toUpperCase())))].filter(d => d && d !== 'ALL');
   const deptFiltersDiv = document.getElementById('audit-dept-filters');
   deptFiltersDiv.innerHTML = ['all', ...uniqueDepartments].map(d => `
     <div class="filter-chip ${auditDeptFilter===d?'active':''}" onclick="setAuditDeptFilter('${d}')">${d==='all'?'All Departments':d}</div>
@@ -863,37 +909,47 @@ function renderAudit(){
   const targetStores = auditFilter === 'all' ? stores : [auditFilter];
   const list = document.getElementById('audit-list'); list.innerHTML = '';
 
+  const deptScope = auditDeptFilter === 'all' ? ['ALL'] : [auditDeptFilter];
+
   targetStores.forEach(store => {
     let checklistsHtml = '';
-    
+
     CHECKLISTS.forEach(cl => {
-      if (auditDeptFilter !== 'all' && cl.department !== auditDeptFilter) return;
-      if (cl.store !== 'All' && cl.store !== store) return; 
+      const vis = visibleTasks(cl, store, deptScope);
+      if (vis.length === 0) return;
 
       const clSaves = records.filter(r => r.store === store && r.date === auditSelectedDate && r.checklistId === cl.id);
       let taskMap = {};
-      cl.tasks.forEach(t => { taskMap[t.name] = { status: 'pending', details: '✗ Pending', photo: null }; });
-      
+      vis.forEach(t => { taskMap[t.name] = { status: 'pending', details: '✗ Pending', photo: null, timing: '' }; });
+
       clSaves.slice().reverse().forEach(save => {
         save.tasks.forEach(t => {
-          if (t.status !== 'pending') {
+          if (taskMap[t.name] && t.status !== 'pending') {  // only count tasks visible under the current store/dept scope
             let timePart = save.timestamp ? new Date(save.timestamp).toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'}) : '';
+            let timing = classifyTiming(save.timestamp, cl.dueMinutes, cl.dueEndMinutes);
             if (t.status === 'ok') {
-              taskMap[t.name] = { status: 'ok', details: `✓ Done by ${save.staff} ${timePart ? `at ${timePart}` : ''} ${t.temp ? `(${t.temp}°C)` : ''}`, photo: t.photo || null };
+              taskMap[t.name] = { status: 'ok', details: `✓ Done by ${save.staff} ${timePart ? `at ${timePart}` : ''} ${t.temp ? `(${t.temp}°C)` : ''}`, photo: t.photo || null, timing: timing };
             } else if (t.status === 'flag') {
-              taskMap[t.name] = { status: 'flag', details: `! Flagged by ${save.staff} ${timePart ? `at ${timePart}` : ''}: ${t.note || 'Issue raised'}`, photo: t.photo || null };
+              taskMap[t.name] = { status: 'flag', details: `! Flagged by ${save.staff} ${timePart ? `at ${timePart}` : ''}: ${t.note || 'Issue raised'}`, photo: t.photo || null, timing: timing };
             }
           }
         });
       });
 
-      let taskRowsHtml = cl.tasks.map(t => {
+      let taskRowsHtml = vis.map(t => {
         const m = taskMap[t.name]; let color = 'var(--text-muted)';
         if (m.status === 'ok') color = 'var(--ok)'; if (m.status === 'flag') color = 'var(--danger)';
+
+        let timingTag = '';
+        if (m.status !== 'pending') {
+          if (m.timing === 'late') timingTag = `<span style="font-size:10px;font-weight:700;color:#fff;background:var(--danger);padding:1px 6px;border-radius:4px;margin-left:6px;">LATE</span>`;
+          else if (m.timing === 'early') timingTag = `<span style="font-size:10px;font-weight:700;color:#fff;background:var(--warning);padding:1px 6px;border-radius:4px;margin-left:6px;">EARLY</span>`;
+        }
+
         return `
           <div style="padding:8px 0; border-bottom:1px solid var(--grey-light); font-size:13px; display:flex; flex-direction:column; gap:2px;">
             <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-              <span style="font-weight:600; color:var(--text);">${t.name}</span>
+              <span style="font-weight:600; color:var(--text);">${t.name}${timingTag}</span>
               <span style="font-size:12px; font-weight:700; text-align:right; max-width:65%; color:${color}; font-style:italic;">${m.details}</span>
             </div>
             ${m.photo ? `<div style="margin-top:4px;"><img src="${m.photo}" style="width:48px; height:36px; object-fit:cover; border-radius:4px; border:1px solid var(--border); cursor:pointer;" onclick="showLightboxSrc('${m.photo}')" /></div>` : ''}
