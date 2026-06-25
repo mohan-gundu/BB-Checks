@@ -185,6 +185,26 @@ input[type="file"].photo-input{display:none;}
   .filter-chip{background:#24211e;}
   .photo-trigger{background:#2a1f14;border-color:#cc5a1a;}
 }
+
+/* ON-DEMAND REPORT (print only) */
+@media screen { #report-output{ display:none; } }
+@media print {
+  body > *:not(#report-output){ display:none !important; }
+  #report-output{ display:block !important; color:#000; font-family:-apple-system,'Segoe UI',sans-serif; }
+  #report-output h1{ font-size:18px; margin:0 0 2px; color:#000; }
+  #report-output .rpt-meta{ font-size:11px; color:#444; margin-bottom:12px; line-height:1.5; }
+  #report-output .rpt-date{ font-size:14px; font-weight:700; background:#eee; padding:4px 8px; margin:14px 0 6px; border-radius:4px; }
+  #report-output .rpt-store{ font-size:13px; font-weight:700; margin:8px 0 4px; }
+  #report-output .rpt-cl{ font-size:12px; font-weight:600; margin:6px 0 2px; }
+  #report-output table{ width:100%; border-collapse:collapse; font-size:11px; margin-bottom:6px; }
+  #report-output th{ text-align:left; border-bottom:1px solid #999; padding:3px 5px; font-size:10px; text-transform:uppercase; color:#555; }
+  #report-output td{ border-bottom:1px solid #ddd; padding:3px 5px; vertical-align:top; }
+  #report-output .miss,#report-output .late,#report-output .fail{ color:#b00; font-weight:700; }
+  #report-output .early{ color:#b35900; font-weight:700; }
+  #report-output .ok{ color:#060; }
+  #report-output .rpt-store,#report-output .rpt-cl,#report-output table{ break-inside:avoid; }
+  @page{ margin:14mm; }
+}
 </style>
 </head>
 <body>
@@ -258,6 +278,7 @@ input[type="file"].photo-input{display:none;}
       <span id="matrix-date-badge" style="font-size:11px; opacity:0.85; background:rgba(255,255,255,0.18); padding:2px 8px; border-radius:10px; margin-top:2px; display:inline-block; cursor:pointer;" onclick="openCalendarPickerModal()">📅 Today</span>
     </div>
     <button class="header-back" id="return-today-shortcut" style="display:none; font-size:12px; background:var(--orange); padding:4px 10px; border-radius:6px; color:white; font-weight:bold; margin-right:8px;" onclick="resetAuditDateToToday()">Today</button>
+    <button class="header-btn" id="audit-report-btn" style="display:none;" onclick="openReportModal()">Report</button>
     <button class="header-btn" id="manager-signout-btn" style="display:none;" onclick="doLogout()">Sign out</button>
   </div>
   <div class="audit-filters" id="audit-filters"></div>
@@ -291,6 +312,40 @@ input[type="file"].photo-input{display:none;}
   <button class="lightbox-close" onclick="hideLightbox()">✕</button>
   <img id="lightbox-img" src="" alt="Evidence photo" />
 </div>
+
+<div class="cal-modal" id="report-modal" style="display:none;" onclick="if(event.target.id==='report-modal') closeReportModal();">
+  <div class="cal-box" style="max-width:380px;">
+    <div class="cal-header">
+      <span class="cal-title">Generate report</span>
+      <button class="header-btn" style="padding:4px 10px;color:var(--brown);border:1px solid var(--border);background:var(--grey-light);" onclick="closeReportModal()">Close</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:6px;">Date range</label>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="date" id="rpt-from" style="flex:1;min-width:0;padding:9px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;color:var(--text);background:var(--surface);">
+          <span style="color:var(--text-muted);font-size:13px;">to</span>
+          <input type="date" id="rpt-to" style="flex:1;min-width:0;padding:9px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;color:var(--text);background:var(--surface);">
+        </div>
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:6px;">Stores</label>
+        <div id="rpt-store-chips" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:6px;">Checks</label>
+        <div id="rpt-type-chips" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:6px;">Detail</label>
+        <div id="rpt-detail-chips" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+      </div>
+      <button class="btn btn-primary" onclick="generateReport()">Generate report</button>
+    </div>
+  </div>
+</div>
+
+<div id="report-output"></div>
 
 <div class="toast" id="toast"></div>
 
@@ -890,6 +945,7 @@ function setAuditDeptFilter(dept) {
 }
 
 function renderAudit(){
+  const rb = document.getElementById('audit-report-btn'); if (rb) rb.style.display = 'block';
   const records = getRecords();
   const stores = ['124 WBR', '811 Fulham Rd', '101 Olympia'];
 
@@ -988,6 +1044,187 @@ function showLightboxSrc(src){document.getElementById('lightbox-img').src=src;do
 function hideLightbox(){document.getElementById('lightbox').style.display='none';}
 function toDateKey(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),5000);}
+
+/* ── ON-DEMAND MANAGER REPORT ────────────────────────────────────────────
+   Manager picks a date range, stores, check-type and detail level. We fetch
+   the whole range in one call (getRange), rebuild the same on-time/late/early
+   picture used elsewhere, render a print-styled report and hand it to the
+   browser's print dialog (Save as PDF / print / share). */
+const REPORT_STORES = ['124 WBR', '811 Fulham Rd', '101 Olympia'];
+let reportStores = new Set(REPORT_STORES);
+let reportCheckType = 'all';   // 'all' | 'temp'
+let reportDetail = 'summary';  // 'summary' | 'full'
+
+function openReportModal(){
+  const today = toDateKey(new Date());
+  document.getElementById('rpt-from').value = today;
+  document.getElementById('rpt-to').value = today;
+  reportStores = new Set(REPORT_STORES);
+  reportCheckType = 'all';
+  reportDetail = 'summary';
+  renderReportChips();
+  document.getElementById('report-modal').style.display = 'flex';
+}
+function closeReportModal(){ document.getElementById('report-modal').style.display = 'none'; }
+
+function renderReportChips(){
+  const allOn = reportStores.size === REPORT_STORES.length;
+  let sHtml = `<div class="filter-chip ${allOn?'active':''}" onclick="toggleReportStore('all')">All</div>`;
+  sHtml += REPORT_STORES.map(s => `<div class="filter-chip ${(!allOn && reportStores.has(s))?'active':''}" onclick="toggleReportStore('${s.replace(/'/g,"\\'")}')">${s}</div>`).join('');
+  document.getElementById('rpt-store-chips').innerHTML = sHtml;
+
+  document.getElementById('rpt-type-chips').innerHTML =
+    [['all','All checks'],['temp','Temperature only']]
+      .map(([v,l]) => `<div class="filter-chip ${reportCheckType===v?'active':''}" onclick="setReportType('${v}')">${l}</div>`).join('');
+
+  document.getElementById('rpt-detail-chips').innerHTML =
+    [['summary','Summary'],['full','Full record']]
+      .map(([v,l]) => `<div class="filter-chip ${reportDetail===v?'active':''}" onclick="setReportDetail('${v}')">${l}</div>`).join('');
+}
+function toggleReportStore(s){
+  if(s === 'all'){ reportStores = new Set(REPORT_STORES); }
+  else {
+    const allOn = reportStores.size === REPORT_STORES.length;
+    if(allOn){ reportStores = new Set([s]); }
+    else if(reportStores.has(s)){ reportStores.delete(s); if(reportStores.size===0) reportStores = new Set(REPORT_STORES); }
+    else { reportStores.add(s); }
+  }
+  renderReportChips();
+}
+function setReportType(v){ reportCheckType = v; renderReportChips(); }
+function setReportDetail(v){ reportDetail = v; renderReportChips(); }
+
+function fetchRange(from, to){
+  const url = PRECONFIGURED_WEBHOOK || getWebhook();
+  return new Promise((resolve) => {
+    if(!url){ resolve([]); return; }
+    const cb = 'bb_range_' + Date.now();
+    const script = document.createElement('script');
+    const timer = setTimeout(() => { cleanup(); resolve([]); }, 15000);
+    window[cb] = function(rows){ cleanup(); resolve(Array.isArray(rows) ? rows : []); };
+    function cleanup(){ clearTimeout(timer); delete window[cb]; if(script.parentNode) script.parentNode.removeChild(script); }
+    script.onerror = () => { cleanup(); resolve([]); };
+    script.src = url + '?action=getRange&from=' + from + '&to=' + to + '&callback=' + cb;
+    document.head.appendChild(script);
+  });
+}
+
+function datesBetween(from, to){
+  const out = []; let d = new Date(from + 'T00:00:00'); const end = new Date(to + 'T00:00:00');
+  while(d <= end){ out.push(toDateKey(d)); d.setDate(d.getDate() + 1); }
+  return out;
+}
+function minsToLabel(m){ const h = Math.floor(m/60), mm = m%60; return String(h).padStart(2,'0') + ':' + String(mm).padStart(2,'0'); }
+function escapeHtml(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// Latest non-pending status per date|store|checklist|task wins (matches the app).
+function buildEntryLookup(records){
+  const map = {};
+  records.slice().sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp)).forEach(r => {
+    r.tasks.forEach(t => {
+      if(t.status === 'pending') return;
+      const key = r.date + '|' + r.store + '|' + r.checklistId + '|' + t.name;
+      map[key] = { status: t.status, note: t.note || '', temp: t.temp, signedBy: t.signedBy || r.staff, ts: r.timestamp };
+    });
+  });
+  return map;
+}
+
+function buildReportModel(records, opts){
+  const lookup = buildEntryLookup(records);
+  const out = [];
+  datesBetween(opts.from, opts.to).forEach(date => {
+    const storeBlocks = [];
+    opts.stores.forEach(store => {
+      const clBlocks = [];
+      CHECKLISTS.forEach(cl => {
+        let vis = visibleTasks(cl, store, ['ALL']);
+        if(opts.tempOnly) vis = vis.filter(t => t.type === 'temp');
+        if(vis.length === 0) return;
+        const rows = [];
+        vis.forEach(task => {
+          const hit = lookup[date + '|' + store + '|' + cl.id + '|' + task.name];
+          let row;
+          if(!hit){
+            row = { name: task.name, type: task.type, status: 'missed', timing: '', signedBy: '', time: '', temp: '', note: '', min: task.min, max: task.max, pass: null };
+          } else {
+            const timing = classifyTiming(hit.ts, cl.dueMinutes, cl.dueEndMinutes);
+            const time = hit.ts ? new Date(hit.ts).toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'}) : '';
+            let pass = null;
+            if(task.type === 'temp'){ const n = parseFloat(hit.temp); pass = (!isNaN(n) && n >= task.min && n <= task.max); }
+            row = { name: task.name, type: task.type, status: hit.status, timing, signedBy: hit.signedBy || '', time, temp: hit.temp, note: hit.note || '', min: task.min, max: task.max, pass };
+          }
+          if(opts.detail === 'summary'){
+            const isException = row.status === 'missed' || row.status === 'flag' || row.timing === 'late' || row.timing === 'early' || (row.type === 'temp' && row.pass === false);
+            if(!isException) return;
+          }
+          rows.push(row);
+        });
+        if(rows.length > 0) clBlocks.push({ id: cl.id, label: cl.label, icon: cl.icon, dueLabel: cl.dueTimeLabel, dueEndLabel: minsToLabel(cl.dueEndMinutes), rows });
+      });
+      if(clBlocks.length > 0) storeBlocks.push({ store, checklists: clBlocks });
+    });
+    if(storeBlocks.length > 0) out.push({ date, stores: storeBlocks });
+  });
+  return out;
+}
+
+function renderReportHtml(model, opts){
+  const now = new Date();
+  const storesLabel = opts.stores.length === REPORT_STORES.length ? 'All stores' : opts.stores.join(', ');
+  const typeLabel = opts.tempOnly ? 'Temperature checks only' : 'All checks';
+  const detailLabel = opts.detail === 'summary' ? 'Summary — exceptions only (missed, late, early, failed, flagged)' : 'Full record';
+  let html = `<h1>Bridge Baker — Compliance Report</h1>
+    <div class="rpt-meta">${formatToHumanDate(opts.from)} – ${formatToHumanDate(opts.to)} &middot; ${storesLabel} &middot; ${typeLabel} &middot; ${detailLabel}<br>Generated ${now.toLocaleString('en-GB')}</div>`;
+
+  if(model.length === 0){
+    html += `<p style="font-size:13px;">${opts.detail === 'summary' ? 'No missed, late, early, failed or flagged checks in this range. All clear.' : 'No records found for this range.'}</p>`;
+    return html;
+  }
+
+  model.forEach(day => {
+    html += `<div class="rpt-date">${formatToHumanDate(day.date)}</div>`;
+    day.stores.forEach(sb => {
+      html += `<div class="rpt-store">${escapeHtml(sb.store)}</div>`;
+      sb.checklists.forEach(cb => {
+        html += `<div class="rpt-cl">${cb.icon||''} ${escapeHtml(cb.label)} <span style="font-weight:400;color:#777;">(due ${cb.dueLabel}–${cb.dueEndLabel})</span></div>`;
+        html += `<table><thead><tr><th>Task</th><th>Result</th><th>Signed by</th><th>Time</th></tr></thead><tbody>`;
+        cb.rows.forEach(r => {
+          let result = '';
+          if(r.status === 'missed'){ result = `<span class="miss">✗ NOT COMPLETED</span>`; }
+          else if(r.status === 'flag'){ result = `<span class="late">! Flagged${r.note ? ': ' + escapeHtml(r.note) : ''}</span>`; }
+          else {
+            if(r.type === 'temp'){
+              result = `<span class="${r.pass?'ok':'fail'}">✓ ${r.temp!=='' ? escapeHtml(r.temp) + '°C ' : ''}${r.pass?'PASS':'FAIL'}</span> <span style="color:#777;">(range ${r.min}–${r.max}°C)</span>`;
+            } else {
+              result = `<span class="ok">✓ Done</span>`;
+            }
+            if(r.timing === 'late') result += ` <span class="late">· LATE</span>`;
+            else if(r.timing === 'early') result += ` <span class="early">· EARLY</span>`;
+          }
+          html += `<tr><td>${escapeHtml(r.name)}</td><td>${result}</td><td>${escapeHtml(r.signedBy||'—')}</td><td>${r.time||'—'}</td></tr>`;
+        });
+        html += `</tbody></table>`;
+      });
+    });
+  });
+  return html;
+}
+
+async function generateReport(){
+  const from = document.getElementById('rpt-from').value;
+  const to = document.getElementById('rpt-to').value;
+  if(!from || !to){ showToast('Pick both dates'); return; }
+  if(from > to){ showToast('“From” date is after “To” date'); return; }
+
+  const opts = { from, to, stores: [...reportStores], tempOnly: reportCheckType === 'temp', detail: reportDetail };
+  closeReportModal();
+  showToast('⏳ Building report…');
+  const records = await fetchRange(from, to);
+  const model = buildReportModel(records, opts);
+  document.getElementById('report-output').innerHTML = renderReportHtml(model, opts);
+  setTimeout(() => { window.print(); }, 250);
+}
 
 const PRECONFIGURED_WEBHOOK = 'https://script.google.com/macros/s/AKfycbzjmW-M45t7KV8scT1aP02qqb7mKLZc-5NCkIO4OP5F50yf5_ONxlkmENegUquftt1q/exec';
 
