@@ -583,9 +583,13 @@ function openChecklist(id){
   taskStates={};
   currentVisibleTasks.forEach(t=>{taskStates[t.name]={status:'pending',note:'',temp:'',photo:null,signedBy:null,time:null};});
   document.getElementById('checklist-title').textContent=currentChecklist.icon+' '+currentChecklist.label;
-  document.getElementById('task-list').innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);font-weight:500;">⏳ Syncing latest logs...</div>';
   showScreen('screen-checklist');
   const todayKey=toDateKey(new Date());
+  // Paint instantly from the copy already cached on this device…
+  mergeAndRender(id,todayKey);
+  // …then refresh in the background and re-render only when the sync lands.
+  // The merge is additive (it only layers in saved statuses), so a background
+  // refresh can't wipe ticks a staff member is part-way through entering.
   syncFromSheets(currentUser.store,todayKey).then(()=>{ mergeAndRender(id,todayKey); });
 }
 
