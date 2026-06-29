@@ -495,7 +495,7 @@ function jumpToDueNow() {
     const saves = recs.filter(r => r.checklistId === clId); const merged = {};
     tasks.forEach(t => { merged[t.name] = 'pending'; });
     saves.slice().reverse().forEach(save => {
-      save.tasks.forEach(t => { if(t.status !== 'pending') merged[t.name] = t.status; });
+      save.tasks.forEach(t => { if(t.status !== 'pending' && merged[t.name] !== undefined) merged[t.name] = t.status; });
     });
     return merged;
   }
@@ -520,7 +520,7 @@ function jumpToOverdue() {
     const saves = recs.filter(r => r.checklistId === clId); const merged = {};
     tasks.forEach(t => { merged[t.name] = 'pending'; });
     saves.slice().reverse().forEach(save => {
-      save.tasks.forEach(t => { if(t.status !== 'pending') merged[t.name] = t.status; });
+      save.tasks.forEach(t => { if(t.status !== 'pending' && merged[t.name] !== undefined) merged[t.name] = t.status; });
     });
     return merged;
   }
@@ -601,7 +601,7 @@ function renderHome(){
   function getMergedState(clId, tasks){
     const saves=recs.filter(r=>r.checklistId===clId); const merged={};
     tasks.forEach(t=>{merged[t.name]='pending';});
-    saves.slice().reverse().forEach(save=>{ save.tasks.forEach(t=>{ if(t.status!=='pending') merged[t.name]=t.status; }); });
+    saves.slice().reverse().forEach(save=>{ save.tasks.forEach(t=>{ if(t.status!=='pending' && merged[t.name]!==undefined) merged[t.name]=t.status; }); });
     return merged;
   }
 
@@ -643,7 +643,7 @@ function renderHome(){
     const overdue=!allDone&&nowMin > cl.dueEndMinutes;
     const due=!allDone&&nowMin >= cl.dueMinutes && !overdue;
 
-    const total=vis.length; const pct=allDone?100:Math.round(completedCount/total*100);
+    const total=vis.length; const pct=allDone?100:Math.min(100,Math.round(completedCount/total*100));
     let st='',sc='';
     if(allDone&&flagged){st='⚠ Done with flags';sc='overdue';}
     else if(allDone){st='✓ Complete';sc='done';}
