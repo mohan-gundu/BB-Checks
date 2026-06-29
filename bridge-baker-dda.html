@@ -71,7 +71,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .home-greeting strong{color:var(--text);}
 .date-badge{display:inline-block;background:var(--orange-light);color:var(--orange-dark);padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;margin-top:6px;letter-spacing:0.2px;}
 .section-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--text-muted);padding:18px 16px 8px;}
-.status-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:0 16px;}
+.status-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 16px;}
 .stat-card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:12px 8px;text-align:center;}
 .stat-num{font-size:24px;font-weight:700;}
 .stat-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-top:3px;}
@@ -249,8 +249,9 @@ input[type="file"].photo-input{display:none;}
   <div class="section-title">Today's overview</div>
   <div class="status-grid">
     <div class="stat-card ok"><div class="stat-num" id="stat-done">0</div><div class="stat-label">Done</div></div>
-    <div class="stat-card danger" style="cursor:pointer" onclick="jumpToDueNow()"><div class="stat-num" id="stat-due">0</div><div class="stat-label">Due now ↗</div></div>
-    <div class="stat-card warn" style="cursor:pointer" onclick="jumpToFlags()"><div class="stat-num" id="stat-flags">0</div><div class="stat-label">Flags ↗</div></div>
+    <div class="stat-card warn" style="cursor:pointer" onclick="jumpToDueNow()"><div class="stat-num" id="stat-due">0</div><div class="stat-label">Due now ↗</div></div>
+    <div class="stat-card danger" style="cursor:pointer" onclick="jumpToOverdue()"><div class="stat-num" id="stat-overdue">0</div><div class="stat-label">Overdue ↗</div></div>
+    <div class="stat-card danger" style="cursor:pointer" onclick="jumpToFlags()"><div class="stat-num" id="stat-flags">0</div><div class="stat-label">Flags ↗</div></div>
   </div>
 
   <div class="section-title">Checklists</div>
@@ -383,8 +384,9 @@ function taskMatchesDept(taskDept, departments){
   const td = String(taskDept||'').trim().toUpperCase();
   if(td==='' || td==='ALL') return true;               // task open to all departments
   if(!departments || departments.length===0) return false;
-  if(departments.indexOf('ALL')>-1) return true;       // user belongs to all departments
-  return departments.indexOf(td)>-1;
+  const depUpper = departments.map(d => String(d||'').trim().toUpperCase());
+  if(depUpper.indexOf('ALL')>-1) return true;       // user belongs to all departments
+  return depUpper.indexOf(td)>-1;
 }
 function visibleTasks(checklist, store, departments){
   return checklist.tasks.filter(t => taskMatchesStore(t.store, store) && taskMatchesDept(t.department, departments));
@@ -503,9 +505,34 @@ function jumpToDueNow() {
 
     const merged = getMergedState(cl.id, vis);
     const allDone = Object.values(merged).every(s => s !== 'pending');
-    if (!allDone && nowMin >= cl.dueMinutes) { openChecklist(cl.id); return; }
+    if (!allDone && nowMin >= cl.dueMinutes && nowMin <= cl.dueEndMinutes) { openChecklist(cl.id); return; }
   }
   showToast("🎉 No pending checklists due right now!");
+}
+
+function jumpToOverdue() {
+  const now = new Date();
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const todayKey = toDateKey(now);
+  const recs = getRecords().filter(r => r.store === currentUser.store && r.date === todayKey);
+
+  function getMergedState(clId, tasks){
+    const saves = recs.filter(r => r.checklistId === clId); const merged = {};
+    tasks.forEach(t => { merged[t.name] = 'pending'; });
+    saves.slice().reverse().forEach(save => {
+      save.tasks.forEach(t => { if(t.status !== 'pending') merged[t.name] = t.status; });
+    });
+    return merged;
+  }
+  for (let cl of CHECKLISTS) {
+    const vis = visibleTasks(cl, currentUser.store, effectiveDepartments());
+    if (vis.length === 0) continue;
+
+    const merged = getMergedState(cl.id, vis);
+    const allDone = Object.values(merged).every(s => s !== 'pending');
+    if (!allDone && nowMin > cl.dueEndMinutes) { openChecklist(cl.id); return; }
+  }
+  showToast("✅ Nothing overdue right now!");
 }
 
 function jumpToFlags() {
@@ -578,25 +605,31 @@ function renderHome(){
     return merged;
   }
 
-  let totalDone=0,flagCount=0,dueCount=0;
-  const nowMin = now.getHours() * 60 + now.getMinutes();
+  let doneTasks=0, flagTasks=0, dueTasks=0, overdueTasks=0;
+  const nowMin = now.getHours()*60 + now.getMinutes();
 
   CHECKLISTS.forEach(cl=>{
     const vis = visibleTasks(cl, currentUser.store, depts);
     if (vis.length === 0) return;
 
-    const merged=getMergedState(cl.id,vis);
-    const completedCount=Object.values(merged).filter(s=>s!=='pending').length;
-    if(completedCount===vis.length) totalDone++;
-    if(recs.some(r=>r.checklistId===cl.id&&r.hasFlag)) flagCount++;
+    const merged   = getMergedState(cl.id, vis);
+    const statuses = Object.values(merged);
+    const pending  = statuses.filter(s=>s==='pending').length;
 
-    const allDone=Object.values(merged).every(s=>s!=='pending');
-    if(!allDone&&nowMin >= cl.dueMinutes) dueCount++;
+    doneTasks += statuses.filter(s=>s!=='pending').length;  // ok or flag = actioned
+    flagTasks += statuses.filter(s=>s==='flag').length;
+
+    if (pending > 0) {
+      if (nowMin > cl.dueEndMinutes)    overdueTasks += pending;  // window has closed
+      else if (nowMin >= cl.dueMinutes) dueTasks     += pending;  // inside the window
+      // before dueMinutes → not yet due, counted in neither
+    }
   });
 
-  document.getElementById('stat-done').textContent=totalDone;
-  document.getElementById('stat-due').textContent=dueCount;
-  document.getElementById('stat-flags').textContent=flagCount;
+  document.getElementById('stat-done').textContent    = doneTasks;
+  document.getElementById('stat-due').textContent     = dueTasks;
+  document.getElementById('stat-overdue').textContent = overdueTasks;
+  document.getElementById('stat-flags').textContent   = flagTasks;
 
   const menu=document.getElementById('checklist-menu'); menu.innerHTML='';
   CHECKLISTS.forEach(cl=>{
@@ -623,7 +656,7 @@ function renderHome(){
       <div class="checklist-info">
         <h3>${cl.label} <span style="font-size:10px; color:var(--text-muted); font-weight:normal;">(${[...new Set(vis.map(t=>String(t.department||'').trim().toUpperCase()).filter(Boolean))].join(' · ')})</span></h3>
         <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
-        <p style="margin-top:3px">${allDone?`${total}/${total} tasks`:hasSaves?`${completedCount}/${total} tasks`:`${total} tasks`}</p>
+        <p style="margin-top:3px">${completedCount}/${total} tasks</p>
       </div>
       <span class="checklist-status ${sc}">${st}</span>
       <span class="chevron">›</span>
