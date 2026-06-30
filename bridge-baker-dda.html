@@ -213,6 +213,7 @@ input[type="file"].photo-input{display:none;}
   <div class="login-logo">
     <div class="logo-title">Bridge <span class="logo-orange">Baker</span></div>
     <div class="logo-sub">Daily Due Diligence</div>
+    <div id="login-version" style="margin-top:6px;font-size:11px;color:rgba(255,255,255,.55);"></div>
   </div>
   <div class="login-card">
     <h2>Sign in</h2>
@@ -245,6 +246,7 @@ input[type="file"].photo-input{display:none;}
   <div class="home-greeting">
     <p>Signed in as <strong id="home-name"></strong></p>
     <span class="date-badge" id="home-date"></span>
+    <span id="home-version" title="App version" style="font-size:11px;color:var(--text-muted);opacity:.8;margin-left:8px;"></span>
   </div>
   <div class="section-title">Today's overview</div>
   <div class="status-grid">
@@ -360,6 +362,8 @@ let currentChecklist = null;
 let currentVisibleTasks = [];   // tasks visible for the current user+store, set when a checklist is opened
 let taskStates = {};
 let flagTarget = null;
+let baselineSig = {};            // per-task signature already persisted when a checklist opens
+const APP_VERSION = 'v1.4';      // bump on each deploy — shown in-app for a quick hygiene check
 let auditFilter = 'all';
 let auditDeptFilter = 'all';
 let auditSelectedDate = '';
@@ -587,6 +591,7 @@ function renderHome(){
   document.getElementById('home-name').textContent=currentUser.name;
   document.getElementById('home-store-label').textContent=currentUser.store;
   const now=new Date(); document.getElementById('home-date').textContent=now.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'});
+  const hv=document.getElementById('home-version'); if(hv) hv.textContent=APP_VERSION;
   const todayKey=toDateKey(now); const recs=getRecords().filter(r=>r.store===currentUser.store&&r.date===todayKey);
 
   // Department chips: "All" (union) plus one per department, shown only when
@@ -694,6 +699,19 @@ function mergeAndRender(id,todayKey){
     save.tasks.forEach(t=>{
       if(taskStates[t.name] && t.status!=='pending'){
         taskStates[t.name]={ status:t.status, note:t.note||'', temp:t.temp||'', photo:t.photo||null, signedBy:t.signedBy||save.staff, time: save.timestamp ? new Date(save.timestamp).toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'}) : '' };
+      }
+    });
+  });
+  // Snapshot what's ALREADY recorded for each task, derived purely from saved
+  // records (not from in-progress edits). Submit uses this so it only sends
+  // tasks that are genuinely new or changed — leaving each already-done task's
+  // original completion time untouched instead of re-stamping it.
+  baselineSig={};
+  currentVisibleTasks.forEach(t=>{ baselineSig[t.name]='pending||'; });
+  allSaves.slice().reverse().forEach(save=>{
+    save.tasks.forEach(t=>{
+      if(baselineSig[t.name]!==undefined && t.status!=='pending'){
+        baselineSig[t.name]=t.status+'|'+(t.temp||'')+'|'+(t.note||'');
       }
     });
   });
@@ -870,9 +888,17 @@ function submitChecklist(){
   const taskArr=currentVisibleTasks.map(t=>({
     name:t.name, status:taskStates[t.name].status, note:taskStates[t.name].note, temp:taskStates[t.name].temp, photo:taskStates[t.name].photo||null, hasPhoto:!!taskStates[t.name].photo, signedBy:taskStates[t.name].status!=='pending'?currentUser.name:null
   }));
-  const actioned=taskArr.filter(t=>t.status!=='pending');
-  if(actioned.length===0){ showToast('Nothing to submit yet — tick at least one task'); return; }
-  const done=actioned.length; const total=taskArr.length; const allDone=done===total; const hasFlag=taskArr.some(t=>t.status==='flag');
+  const actioned=taskArr.filter(t=>{
+    const sig=t.status+'|'+(t.temp||'')+'|'+(t.note||'');
+    return t.status!=='pending' && sig!==(baselineSig[t.name]||'pending||');
+  });
+  if(actioned.length===0){
+    const anyDone=taskArr.some(t=>t.status!=='pending');
+    if(anyDone){ showToast('✓ Already saved — no new changes'); showScreen('screen-home'); }
+    else { showToast('Nothing to submit yet — tick at least one task'); }
+    return;
+  }
+  const done=taskArr.filter(t=>t.status!=='pending').length; const total=taskArr.length; const allDone=done===total; const hasFlag=taskArr.some(t=>t.status==='flag');
 
   const rec={ id:Date.now(), timestamp:new Date().toISOString(), date:toDateKey(new Date()), store:currentUser.store, staff:currentUser.name, checklistId:currentChecklist.id, checklistName:currentChecklist.label, partial:!allDone, hasFlag, tasks:taskArr };
 
@@ -1332,6 +1358,7 @@ async function generateReport(){
 const PRECONFIGURED_WEBHOOK = 'https://script.google.com/macros/s/AKfycbzCNaostAl2gRJcVCNSNwi-92B46q5GW1SRwB5oC3Ge9H_tDE1tFl6m_36XBOAXgcW5/exec';
 
 window.addEventListener('load',()=>{
+  const lv=document.getElementById('login-version'); if(lv) lv.textContent=APP_VERSION;
   if(!localStorage.getItem('bb_webhook')&&PRECONFIGURED_WEBHOOK)localStorage.setItem('bb_webhook',PRECONFIGURED_WEBHOOK);
   fetchSystemData();
 });
