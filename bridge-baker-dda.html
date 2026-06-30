@@ -366,7 +366,14 @@ let auditSelectedDate = '';
 let currentHomeDeptFilter = '';  // '' = union of all the user's departments
 
 function getRecords(){try{return JSON.parse(localStorage.getItem('bb_records')||'[]');}catch{return[];}}
-function saveRecord(rec){const r=getRecords();r.unshift(rec);localStorage.setItem('bb_records',JSON.stringify(r.slice(0,300)));}
+function saveRecord(rec){
+  const r=getRecords(); r.unshift(rec);
+  // Never keep base64 photos locally — they live in Drive via the sheet. This
+  // keeps local storage tiny so it can't overflow and silently block a submit.
+  const light=r.slice(0,300).map(x=>({ ...x, tasks:(x.tasks||[]).map(t=>({ ...t, photo:null })) }));
+  try{ localStorage.setItem('bb_records',JSON.stringify(light)); }
+  catch(e){ try{ localStorage.setItem('bb_records',JSON.stringify(light.slice(0,100))); }catch(_){ /* local cache is optional; sheet is the source of truth */ } }
+}
 function getWebhook(){return localStorage.getItem('bb_webhook')||'';}
 
 /* ── Targeting: ONE shared filter that decides which tasks apply ──────────
@@ -786,14 +793,10 @@ function handleTaskClick(name){
     s.status = 'ok'; s.signedBy = currentUser.name; s.time = new Date().toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'});
     renderTaskList(); showToast('✓ Signed off');
   } else {
-    let choice = confirm("This line metric is already filled. Do you want to uncheck it and completely wipe out all associated record inputs?\n\n(Click 'Cancel' if you just want to update a physical problem flag narrative instead.)");
-    if(choice) {
-      s.status = 'pending'; s.note = ''; s.temp = ''; s.photo = null; s.signedBy = null; s.time = null;
-      renderTaskList(); showToast('Reset line items to empty');
-    } else {
-      flagTarget = name; document.getElementById('modal-title').textContent = name;
-      document.getElementById('modal-note').value = s.note || ''; document.getElementById('modal').style.display = 'flex';
-    }
+    // A sign-off is final and cannot be unchecked back to blank. Re-tapping a
+    // completed task lets you raise or update a flag instead.
+    flagTarget = name; document.getElementById('modal-title').textContent = name;
+    document.getElementById('modal-note').value = s.note || ''; document.getElementById('modal').style.display = 'flex';
   }
 }
 
@@ -861,19 +864,78 @@ function submitChecklist(){
   const photoMissing=currentVisibleTasks.filter(t=>t.requirePhoto && taskStates[t.name].status!=='pending' && !taskStates[t.name].photo);
   if(photoMissing.length>0){showToast(`📷 Photo required: ${photoMissing[0].name}`);return;}
 
+  // Full set drives the local copy and the home screen; only actioned tasks
+  // (ok / flag) are written to the sheet — pending rows are noise the reader
+  // ignores anyway.
   const taskArr=currentVisibleTasks.map(t=>({
     name:t.name, status:taskStates[t.name].status, note:taskStates[t.name].note, temp:taskStates[t.name].temp, photo:taskStates[t.name].photo||null, hasPhoto:!!taskStates[t.name].photo, signedBy:taskStates[t.name].status!=='pending'?currentUser.name:null
   }));
-  const done=taskArr.filter(t=>t.status!=='pending').length; const total=taskArr.length; const allDone=done===total; const hasFlag=taskArr.some(t=>t.status==='flag');
+  const actioned=taskArr.filter(t=>t.status!=='pending');
+  if(actioned.length===0){ showToast('Nothing to submit yet — tick at least one task'); return; }
+  const done=actioned.length; const total=taskArr.length; const allDone=done===total; const hasFlag=taskArr.some(t=>t.status==='flag');
 
   const rec={ id:Date.now(), timestamp:new Date().toISOString(), date:toDateKey(new Date()), store:currentUser.store, staff:currentUser.name, checklistId:currentChecklist.id, checklistName:currentChecklist.label, partial:!allDone, hasFlag, tasks:taskArr };
-  saveRecord(rec); showScreen('screen-home'); sendToSheets(rec);
+
+  submitToSheetsConfirmed(rec, actioned);
 }
 
-async function sendToSheets(rec){
-  const url=PRECONFIGURED_WEBHOOK||getWebhook(); if(!url)return;
-  const payload = { timestamp: rec.timestamp, date: rec.date, store: rec.store, staff: rec.staff, checklistName: rec.checklistName, tasks: rec.tasks.map(t => ({ name: t.name, status: t.status, note: t.note, temp: t.temp, hasPhoto: t.hasPhoto, photoData: t.photo })) };
-  try { await fetch(url, { method: "POST", mode: "no-cors", body: JSON.stringify(payload) }); } catch(err) { console.error(err); }
+// Posts the actioned tasks, then reads the day back to confirm the write
+// actually landed. Staff get a clear result, the button is locked while saving
+// (no accidental triple-submits), and the local copy is only written once the
+// sheet has the data.
+async function submitToSheetsConfirmed(rec, actioned){
+  const btn=document.getElementById('submit-btn');
+  const banner=document.getElementById('submit-progress');
+  const prevBtn=btn?btn.textContent:'';
+  if(btn){ btn.disabled=true; btn.style.opacity='0.7'; btn.textContent='Saving…'; }
+  if(banner) banner.textContent='Saving… please wait';
+
+  const url=PRECONFIGURED_WEBHOOK||getWebhook();
+  let landed=false;
+  if(url){
+    const payload={ timestamp:rec.timestamp, date:rec.date, store:rec.store, staff:rec.staff, checklistName:rec.checklistName,
+      tasks:actioned.map(t=>({ name:t.name, status:t.status, note:t.note, temp:t.temp, hasPhoto:t.hasPhoto, photoData:t.photo })) };
+    try{ await fetch(url,{ method:'POST', mode:'no-cors', body:JSON.stringify(payload) }); }catch(err){ /* response is opaque; the read-back below is the real check */ }
+    for(let attempt=0; attempt<3 && !landed; attempt++){
+      await sleepMs(900);
+      landed=await confirmWriteLanded(url, rec);
+    }
+  }
+
+  if(btn){ btn.disabled=false; btn.style.opacity='1'; btn.textContent=prevBtn||'Submit checklist ✓'; }
+
+  if(landed){
+    saveRecord(rec);
+    showToast('✓ Saved');
+    showScreen('screen-home');
+  } else {
+    if(banner) banner.textContent='⚠ Not saved — check signal and tap Submit again';
+    showToast('⚠ Couldn’t save — check signal and tap Submit again');
+    // We stay on the checklist; every tick is preserved, so they just re-submit.
+  }
+}
+
+function sleepMs(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+// Reads today's records for this store and checks our submission is present.
+function confirmWriteLanded(url, rec){
+  return fetchDayRecordsJSONP(url, rec.store, rec.date).then(remote=>{
+    if(!Array.isArray(remote)) return false;
+    return remote.some(r=> r && r.timestamp===rec.timestamp && r.checklistName===rec.checklistName && r.staff===rec.staff);
+  }).catch(()=>false);
+}
+
+function fetchDayRecordsJSONP(url, store, date){
+  return new Promise((resolve)=>{
+    const cb='bb_confirm_'+Date.now()+'_'+Math.floor(Math.random()*100000);
+    const src=url+'?store='+encodeURIComponent(store)+'&date='+date+'&callback='+cb;
+    const script=document.createElement('script');
+    const timer=setTimeout(()=>{ cleanup(); resolve(null); }, 5000);
+    window[cb]=function(data){ cleanup(); resolve(data); };
+    function cleanup(){ clearTimeout(timer); try{ delete window[cb]; }catch(e){} if(script.parentNode) script.parentNode.removeChild(script); }
+    script.onerror=()=>{ cleanup(); resolve(null); };
+    script.src=src; document.head.appendChild(script);
+  });
 }
 
 async function syncFromSheets(store,dateKey){
@@ -1267,7 +1329,7 @@ async function generateReport(){
   setTimeout(() => { window.print(); }, 250);
 }
 
-const PRECONFIGURED_WEBHOOK = 'https://script.google.com/macros/s/AKfycbzCNaostAl2gRJcVCNSNwi-92B46q5GW1SRwB5oC3Ge9H_tDE1tFl6m_36XBOAXgcW5/exec';
+const PRECONFIGURED_WEBHOOK = 'https://script.google.com/macros/s/AKfycbzjmW-M45t7KV8scT1aP02qqb7mKLZc-5NCkIO4OP5F50yf5_ONxlkmENegUquftt1q/exec';
 
 window.addEventListener('load',()=>{
   if(!localStorage.getItem('bb_webhook')&&PRECONFIGURED_WEBHOOK)localStorage.setItem('bb_webhook',PRECONFIGURED_WEBHOOK);
