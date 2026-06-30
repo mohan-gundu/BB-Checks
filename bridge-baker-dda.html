@@ -681,7 +681,7 @@ function openChecklist(id){
   // Lock in the tasks visible to this user+store for the whole checklist session.
   currentVisibleTasks = visibleTasks(currentChecklist, currentUser.store, effectiveDepartments());
   taskStates={};
-  currentVisibleTasks.forEach(t=>{taskStates[t.name]={status:'pending',note:'',temp:'',photo:null,signedBy:null,time:null};});
+  currentVisibleTasks.forEach(t=>{taskStates[t.name]={status:'pending',note:'',temp:'',photo:null,hasPhoto:false,signedBy:null,time:null};});
   document.getElementById('checklist-title').textContent=currentChecklist.icon+' '+currentChecklist.label;
   showScreen('screen-checklist');
   const todayKey=toDateKey(new Date());
@@ -698,7 +698,7 @@ function mergeAndRender(id,todayKey){
   allSaves.slice().reverse().forEach(save=>{
     save.tasks.forEach(t=>{
       if(taskStates[t.name] && t.status!=='pending'){
-        taskStates[t.name]={ status:t.status, note:t.note||'', temp:t.temp||'', photo:t.photo||null, signedBy:t.signedBy||save.staff, time: save.timestamp ? new Date(save.timestamp).toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'}) : '' };
+        taskStates[t.name]={ status:t.status, note:t.note||'', temp:t.temp||'', photo:t.photo||null, hasPhoto:!!(t.photo||t.hasPhoto), signedBy:t.signedBy||save.staff, time: save.timestamp ? new Date(save.timestamp).toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'}) : '' };
       }
     });
   });
@@ -756,6 +756,8 @@ function renderTaskList(){
                <img src="${s.photo}" alt="Evidence" onclick="showLightbox('${task.name.replace(/'/g, "\\'")}')"/>
                <button class="photo-remove" onclick="removePhoto('${task.name.replace(/'/g, "\\'")}')">✕</button>
              </div>`
+          : s.hasPhoto
+          ? `<div style="font-size:12px;color:var(--ok);padding:6px 0;">✓ Photo saved earlier — on record</div>`
           : `<label class="photo-trigger" for="photo_${task.name.replace(/\s+/g,'_')}">
                <span class="cam-icon">📷</span>
                <span>Tap to take photo or choose from library</span>
@@ -835,7 +837,7 @@ function handlePhoto(taskName,input){
   showToast('⏳ Optimizing file metrics...'); const reader=new FileReader();
   reader.onload=function(e){
     compressImage(e.target.result).then(compressedData => {
-      taskStates[taskName].photo = compressedData; renderTaskList(); showToast('📷 Photo saved & compressed');
+      taskStates[taskName].photo = compressedData; taskStates[taskName].hasPhoto = true; renderTaskList(); showToast('📷 Photo saved & compressed');
     });
   };
   reader.readAsDataURL(file);
@@ -857,19 +859,19 @@ function compressImage(base64Str) {
   });
 }
 
-function removePhoto(taskName){ taskStates[taskName].photo=null; renderTaskList(); }
+function removePhoto(taskName){ taskStates[taskName].photo=null; taskStates[taskName].hasPhoto=false; renderTaskList(); }
 function showLightbox(taskName){ showLightboxSrc(taskStates[taskName].photo); }
 
 function isTaskComplete(task){
   const s=taskStates[task.name]; if(s.status==='pending') return false;
   if(task.type==='temp' && (s.temp === undefined || s.temp === null || String(s.temp).trim() === '')) return false;
-  if(task.requirePhoto && !s.photo) return false;
+  if(task.requirePhoto && !s.photo && !s.hasPhoto) return false;
   return true;
 }
 
 function updateBanner(){
   const total=currentVisibleTasks.length; const done=currentVisibleTasks.filter(t=>isTaskComplete(t)).length;
-  const photosPending=currentVisibleTasks.filter(t=>t.requirePhoto&&taskStates[t.name].status!=='pending'&&!taskStates[t.name].photo).length;
+  const photosPending=currentVisibleTasks.filter(t=>t.requirePhoto&&taskStates[t.name].status!=='pending'&&!taskStates[t.name].photo&&!taskStates[t.name].hasPhoto).length;
   const allDone=done===total&&photosPending===0;
   let msg=`${done} of ${total} tasks completed`;
   if(photosPending>0) msg+=` — ${photosPending} photo${photosPending>1?'s':''} still needed`;
@@ -879,7 +881,7 @@ function updateBanner(){
 }
 
 function submitChecklist(){
-  const photoMissing=currentVisibleTasks.filter(t=>t.requirePhoto && taskStates[t.name].status!=='pending' && !taskStates[t.name].photo);
+  const photoMissing=currentVisibleTasks.filter(t=>t.requirePhoto && taskStates[t.name].status!=='pending' && !taskStates[t.name].photo && !taskStates[t.name].hasPhoto);
   if(photoMissing.length>0){showToast(`📷 Photo required: ${photoMissing[0].name}`);return;}
 
   // Full set drives the local copy and the home screen; only actioned tasks
