@@ -332,18 +332,11 @@ input[type="file"].photo-input{display:none;}
         </div>
       </div>
       <div>
-        <label style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:6px;">Stores</label>
-        <div id="rpt-store-chips" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+        <label style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:6px;">Report type</label>
+        <div id="rpt-mode-chips" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
       </div>
-      <div>
-        <label style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:6px;">Checks</label>
-        <div id="rpt-type-chips" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
-      </div>
-      <div>
-        <label style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:6px;">Detail</label>
-        <div id="rpt-detail-chips" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
-      </div>
-      <button class="btn btn-primary" onclick="generateReport()">Generate report</button>
+      <p style="font-size:12px;color:var(--text-muted);margin:0;line-height:1.4;">Emailed to your address on file. Longer ranges arrive within a minute.</p>
+      <button class="btn btn-primary" onclick="emailRangeReport()">Email report to me</button>
     </div>
   </div>
 </div>
@@ -363,7 +356,7 @@ let currentVisibleTasks = [];   // tasks visible for the current user+store, set
 let taskStates = {};
 let flagTarget = null;
 let baselineSig = {};            // per-task signature already persisted when a checklist opens
-const APP_VERSION = 'v1.5';      // bump on each deploy — shown in-app for a quick hygiene check
+const APP_VERSION = 'v1.6';      // bump on each deploy — shown in-app for a quick hygiene check
 let auditFilter = 'all';
 let auditDeptFilter = 'all';
 let auditSelectedDate = '';
@@ -437,7 +430,7 @@ function showScreen(id){
       renderHome();
     });
   }
-  if(id==='screen-audit') renderAudit();
+  if(id==='screen-audit') fetchAuditDay(toDateKey(new Date()), false);
 }
 
 function goAudit(){
@@ -1107,43 +1100,58 @@ function openCalendarPickerModal() {
     const hasData = LOGGED_DATES.includes(dateKeyStr);
     const isToday = dateKeyStr === toDateKey(new Date());
     const isSelected = dateKeyStr === auditSelectedDate;
+    const daysAgo = Math.round((new Date(toDateKey(new Date()) + 'T00:00:00') - curDate) / 86400000);
+    const tooOld = daysAgo > 7;   // on-screen day view is limited to the last 7 days
 
-    let cellClass = "cal-cell disabled";
-    if (hasData || isToday) cellClass = "cal-cell has-logs";
+    const openable = (hasData || isToday) && !tooOld;
+    let cellClass = openable ? "cal-cell has-logs" : "cal-cell disabled";
     if (isSelected) cellClass += " selected-date";
 
-    targetGrid.innerHTML += `<div class="${cellClass}" onclick="handleCalendarDateClick('${dateKeyStr}')">${day}</div>`;
+    const clickAttr = openable ? `onclick="handleCalendarDateClick('${dateKeyStr}')"` : '';
+    targetGrid.innerHTML += `<div class="${cellClass}" ${clickAttr}>${day}</div>`;
   }
   modal.style.display = 'flex';
 }
 
 function closeCalendarPickerModal() { document.getElementById('cal-modal').style.display = 'none'; }
 
+// Fetches ONE day's records for ALL stores (manager view) and renders the audit.
+// Used for today on audit-open and for a chosen recent day. Older days scan
+// further up the log, so we show a patience note and a generous timeout.
+function fetchAuditDay(dateKey, patient){
+  auditSelectedDate = dateKey;
+  renderAudit(); // paint immediately from whatever's cached
+  const url = PRECONFIGURED_WEBHOOK || getWebhook();
+  if(!url){ return; }
+  if(patient) showToast('📅 Loading ' + dateKey + '… older days can take a moment');
+  const cb = 'bb_audit_' + Date.now();
+  const script = document.createElement('script');
+  const timer = setTimeout(()=>{ cleanup(); showToast('⚠ Slow to load — check signal, then reopen the date'); renderAudit(); }, 25000);
+  window[cb] = function(remoteRows){
+    cleanup();
+    if(Array.isArray(remoteRows) && remoteRows.length > 0){
+      const local = getRecords(); const localIds = new Set(local.map(r=>String(r.id)));
+      remoteRows.forEach(r=>{ if(!localIds.has(String(r.id))) local.push(r); });
+      local.sort((a,b)=>b.id-a.id);
+      try{ localStorage.setItem('bb_records', JSON.stringify(local.slice(0,300))); }catch(e){}
+    }
+    renderAudit();
+  };
+  function cleanup(){ clearTimeout(timer); try{delete window[cb];}catch(e){} if(script.parentNode) script.parentNode.removeChild(script); }
+  script.onerror = ()=>{ cleanup(); renderAudit(); };
+  script.src = url + '?store=&date=' + dateKey + '&callback=' + cb;
+  document.head.appendChild(script);
+}
+
 function handleCalendarDateClick(dateKey) {
   closeCalendarPickerModal();
-  showToast(`📅 Fetching cross-store matrix logs for ${dateKey}...`);
-  auditSelectedDate = dateKey;
-
-  const url = getWebhook();
-  if (url) {
-    const callbackName = 'bb_hist_' + Date.now();
-    const script = document.createElement('script');
-    script.src = url + '?store=&date=' + dateKey + '&callback=' + callbackName;
-    window[callbackName] = function(remoteRows) {
-      if (Array.isArray(remoteRows) && remoteRows.length > 0) {
-        const local = getRecords(); const localIds = new Set(local.map(r=>String(r.id)));
-        remoteRows.forEach(r => { if(!localIds.has(String(r.id))) local.push(r); });
-        local.sort((a,b)=>b.id-a.id); localStorage.setItem('bb_records',JSON.stringify(local.slice(0,300)));
-      }
-      delete window[callbackName]; if (script.parentNode) script.parentNode.removeChild(script);
-      renderAudit();
-    };
-    document.head.appendChild(script);
-  } else { renderAudit(); }
+  const daysAgo = Math.round((new Date(toDateKey(new Date()) + 'T00:00:00') - new Date(dateKey + 'T00:00:00')) / 86400000);
+  if (daysAgo > 7) { showToast('📄 Older than 7 days — use Report (emailed to you)'); return; }
+  fetchAuditDay(dateKey, true);
 }
 
 function resetAuditDateToToday() {
-  auditSelectedDate = toDateKey(new Date()); renderAudit();
+  fetchAuditDay(toDateKey(new Date()), false);
 }
 
 function formatToHumanDate(dateStr) {
@@ -1278,15 +1286,46 @@ let reportStores = new Set(REPORT_STORES);
 let reportCheckType = 'all';   // 'all' | 'temp'
 let reportDetail = 'summary';  // 'summary' | 'full'
 
+let reportMode = 'all';
 function openReportModal(){
   const today = toDateKey(new Date());
   document.getElementById('rpt-from').value = today;
   document.getElementById('rpt-to').value = today;
-  reportStores = new Set(REPORT_STORES);
-  reportCheckType = 'all';
-  reportDetail = 'summary';
-  renderReportChips();
+  reportMode = 'all';
+  renderReportModeChips();
   document.getElementById('report-modal').style.display = 'flex';
+}
+function renderReportModeChips(){
+  document.getElementById('rpt-mode-chips').innerHTML =
+    [['all','Full record'],['failures','Failures only']]
+      .map(([v,l]) => `<div class="filter-chip ${reportMode===v?'active':''}" onclick="setReportMode('${v}')">${l}</div>`).join('');
+}
+function setReportMode(v){ reportMode = v; renderReportModeChips(); }
+
+// Range reports are built SERVER-SIDE and emailed to the manager's own address
+// (resolved from the Staff sheet — no recipient is entered on the device).
+async function emailRangeReport(){
+  const from = document.getElementById('rpt-from').value;
+  const to = document.getElementById('rpt-to').value;
+  if(!from || !to){ showToast('Pick both dates'); return; }
+  const url = PRECONFIGURED_WEBHOOK || getWebhook();
+  if(!url){ showToast('No connection configured'); return; }
+  closeReportModal();
+  showToast('⏳ Requesting report…');
+  const cb = 'bb_rpt_' + Date.now();
+  const script = document.createElement('script');
+  const timer = setTimeout(()=>{ cleanup(); showToast('⚠ Request timed out — check signal and try again'); }, 30000);
+  window[cb] = function(res){
+    cleanup();
+    if(res && res.status === 'ok'){ showToast('✓ Report on its way to your email'); }
+    else if(res && res.status === 'no-email'){ showToast('⚠ No report email set for your profile — add one in the Staff sheet'); }
+    else { showToast('⚠ ' + ((res && res.message) || 'Could not send report')); }
+  };
+  function cleanup(){ clearTimeout(timer); try{delete window[cb];}catch(e){} if(script.parentNode) script.parentNode.removeChild(script); }
+  script.onerror = ()=>{ cleanup(); showToast('⚠ Could not reach the report service'); };
+  const mgr = encodeURIComponent(currentUser && currentUser.name ? currentUser.name : '');
+  script.src = url + '?action=emailReport&from=' + from + '&to=' + to + '&mode=' + reportMode + '&manager=' + mgr + '&callback=' + cb;
+  document.head.appendChild(script);
 }
 function closeReportModal(){ document.getElementById('report-modal').style.display = 'none'; }
 
