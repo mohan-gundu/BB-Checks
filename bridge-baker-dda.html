@@ -356,7 +356,7 @@ let currentVisibleTasks = [];   // tasks visible for the current user+store, set
 let taskStates = {};
 let flagTarget = null;
 let baselineSig = {};            // per-task signature already persisted when a checklist opens
-const APP_VERSION = 'v1.6';      // bump on each deploy — shown in-app for a quick hygiene check
+const APP_VERSION = 'v1.7';      // bump on each deploy — shown in-app for a quick hygiene check
 let auditFilter = 'all';
 let auditDeptFilter = 'all';
 let auditSelectedDate = '';
@@ -426,7 +426,7 @@ function showScreen(id){
   if(id==='screen-home') {
     renderHome();
     const todayKey=toDateKey(new Date());
-    syncFromSheets(currentUser.store,todayKey).then(()=>{
+    syncFromSheets(currentUser.store,todayKey,mondayKeyOf(todayKey)).then(()=>{
       renderHome();
     });
   }
@@ -506,6 +506,7 @@ function jumpToDueNow() {
     return merged;
   }
   for (let cl of CHECKLISTS) {
+    if (isWeeklyChecklist(cl)) continue;   // weekly lists aren't time-windowed — reach them from the menu
     const vis = visibleTasks(cl, currentUser.store, effectiveDepartments());
     if (vis.length === 0) continue;
 
@@ -531,6 +532,7 @@ function jumpToOverdue() {
     return merged;
   }
   for (let cl of CHECKLISTS) {
+    if (isWeeklyChecklist(cl)) continue;   // weekly lists aren't time-windowed — reach them from the menu
     const vis = visibleTasks(cl, currentUser.store, effectiveDepartments());
     if (vis.length === 0) continue;
 
@@ -627,7 +629,8 @@ function renderHome(){
   document.getElementById('home-store-label').textContent=currentUser.store;
   const now=new Date(); document.getElementById('home-date').textContent=now.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'});
   const hv=document.getElementById('home-version'); if(hv) hv.textContent=APP_VERSION;
-  const todayKey=toDateKey(now); const recs=getRecords().filter(r=>r.store===currentUser.store&&r.date===todayKey);
+  const todayKey=toDateKey(now); const weekStart=mondayKeyOf(todayKey);
+  const storeRecs=getRecords().filter(r=>r.store===currentUser.store);
 
   // Department chips: "All" (union) plus one per department, shown only when
   // the user belongs to more than one department.
@@ -645,10 +648,21 @@ function renderHome(){
 
   const depts = effectiveDepartments();
 
+  // Merged state, per-task window/rule:
+  //   • daily task  → today only, last (newest) wins;
+  //   • weekly task → Mon..today, EARLIEST completion in the week wins.
   function getMergedState(clId, tasks){
-    const saves=recs.filter(r=>r.checklistId===clId); const merged={};
-    tasks.forEach(t=>{merged[t.name]='pending';});
-    saves.slice().reverse().forEach(save=>{ save.tasks.forEach(t=>{ if(t.status!=='pending' && merged[t.name]!==undefined) merged[t.name]=t.status; }); });
+    const merged={}; const isWk={}; const firstId={};
+    tasks.forEach(t=>{ merged[t.name]='pending'; isWk[t.name]=isWeeklyTask(t); });
+    const src=storeRecs.filter(r=>r.checklistId===clId).slice().sort((a,b)=>a.id-b.id);
+    src.forEach(save=>{ save.tasks.forEach(t=>{
+      if(merged[t.name]===undefined || t.status==='pending') return;
+      if(isWk[t.name]){
+        if(save.date>=weekStart && save.date<=todayKey && firstId[t.name]===undefined){ merged[t.name]=t.status; firstId[t.name]=save.id; }
+      } else {
+        if(save.date===todayKey) merged[t.name]=t.status;   // ascending → last today wins
+      }
+    }); });
     return merged;
   }
 
@@ -656,21 +670,24 @@ function renderHome(){
   const nowMin = now.getHours()*60 + now.getMinutes();
 
   CHECKLISTS.forEach(cl=>{
-    const vis = visibleTasks(cl, currentUser.store, depts);
+    const vis = visibleTasks(cl, currentUser.store, depts).filter(t=>isDueBy(t, todayKey, weekStart));
     if (vis.length === 0) return;
 
     const merged   = getMergedState(cl.id, vis);
-    const statuses = Object.values(merged);
-    const pending  = statuses.filter(s=>s==='pending').length;
+    doneTasks += Object.values(merged).filter(s=>s!=='pending').length;  // ok or flag = actioned
+    flagTasks += Object.values(merged).filter(s=>s==='flag').length;
 
-    doneTasks += statuses.filter(s=>s!=='pending').length;  // ok or flag = actioned
-    flagTasks += statuses.filter(s=>s==='flag').length;
-
-    if (pending > 0) {
-      if (nowMin > cl.dueEndMinutes)    overdueTasks += pending;  // window has closed
-      else if (nowMin >= cl.dueMinutes) dueTasks     += pending;  // inside the window
-      // before dueMinutes → not yet due, counted in neither
-    }
+    vis.forEach(t=>{
+      if (merged[t.name] !== 'pending') return;
+      if (isWeeklyTask(t)) {
+        if (dueDateKeyFor(t, weekStart) < todayKey) overdueTasks++;  // past its due day, still open
+        else                                        dueTasks++;       // due today
+      } else {
+        if (nowMin > cl.dueEndMinutes)    overdueTasks++;
+        else if (nowMin >= cl.dueMinutes) dueTasks++;
+        // before dueMinutes → not yet due, counted in neither
+      }
+    });
   });
 
   document.getElementById('stat-done').textContent    = doneTasks;
@@ -680,15 +697,23 @@ function renderHome(){
 
   const menu=document.getElementById('checklist-menu'); menu.innerHTML='';
   CHECKLISTS.forEach(cl=>{
-    const vis = visibleTasks(cl, currentUser.store, depts);
-    if (vis.length === 0) return;
+    const weekly = isWeeklyChecklist(cl);
+    const vis = visibleTasks(cl, currentUser.store, depts).filter(t=>isDueBy(t, todayKey, weekStart));
+    if (vis.length === 0) return;   // weekly card only appears once something is due
 
     const merged=getMergedState(cl.id,vis); const completedCount=Object.values(merged).filter(s=>s!=='pending').length;
-    const allDone=completedCount===vis.length; const hasSaves=recs.some(r=>r.checklistId===cl.id); const flagged=recs.some(r=>r.checklistId===cl.id&&r.hasFlag);
+    const allDone=completedCount===vis.length; const flagged=Object.values(merged).some(s=>s==='flag');
 
-    const predue=nowMin < cl.dueMinutes;
-    const overdue=!allDone&&nowMin > cl.dueEndMinutes;
-    const due=!allDone&&nowMin >= cl.dueMinutes && !overdue;
+    let predue=false, overdue=false, due=false;
+    if (weekly) {
+      const openTasks = vis.filter(t=>merged[t.name]==='pending');
+      overdue = openTasks.some(t=>dueDateKeyFor(t, weekStart) < todayKey);
+      due     = !allDone && !overdue && openTasks.length>0;
+    } else {
+      predue  = nowMin < cl.dueMinutes;
+      overdue = !allDone && nowMin > cl.dueEndMinutes;
+      due     = !allDone && nowMin >= cl.dueMinutes && !overdue;
+    }
 
     const total=vis.length; const pct=allDone?100:Math.min(100,Math.round(completedCount/total*100));
     let st='',sc='';
@@ -696,7 +721,7 @@ function renderHome(){
     else if(allDone){st='✓ Complete';sc='done';}
     else if(overdue){st='● Overdue';sc='overdue';}
     else if(due){st='● Due now';sc='due';}
-    else{st=`Due ${cl.dueTimeLabel}`;sc='';}
+    else{st=weekly?'This week':`Due ${cl.dueTimeLabel}`;sc='';}
 
     menu.innerHTML+=`<div class="checklist-item${due||overdue?' has-orange':''}${predue?' predue':''}" onclick="openChecklist('${cl.id}')">
       <div class="checklist-icon" style="background:${cl.color}">${cl.icon}</div>
@@ -713,41 +738,56 @@ function renderHome(){
 
 function openChecklist(id){
   currentChecklist=CHECKLISTS.find(c=>c.id===id);
+  const todayKey=toDateKey(new Date());
+  const weekStart=mondayKeyOf(todayKey);
   // Lock in the tasks visible to this user+store for the whole checklist session.
-  currentVisibleTasks = visibleTasks(currentChecklist, currentUser.store, effectiveDepartments());
+  // Weekly tasks appear only once their due day has arrived in the current week.
+  currentVisibleTasks = visibleTasks(currentChecklist, currentUser.store, effectiveDepartments()).filter(t=>isDueBy(t, todayKey, weekStart));
   taskStates={};
   currentVisibleTasks.forEach(t=>{taskStates[t.name]={status:'pending',note:'',temp:'',photo:null,hasPhoto:false,signedBy:null,time:null};});
   document.getElementById('checklist-title').textContent=currentChecklist.icon+' '+currentChecklist.label;
   showScreen('screen-checklist');
-  const todayKey=toDateKey(new Date());
   // Paint instantly from the copy already cached on this device…
   mergeAndRender(id,todayKey);
-  // …then refresh in the background and re-render only when the sync lands.
-  // The merge is additive (it only layers in saved statuses), so a background
-  // refresh can't wipe ticks a staff member is part-way through entering.
-  syncFromSheets(currentUser.store,todayKey).then(()=>{ mergeAndRender(id,todayKey); });
+  // …then refresh in the background and re-render only when the sync lands. For
+  // a weekly checklist we pull the whole current week (Mon→today) so tasks done
+  // earlier in the week come back ticked; for a daily one, just today.
+  const fromKey = isWeeklyChecklist(currentChecklist) ? weekStart : todayKey;
+  syncFromSheets(currentUser.store,todayKey,fromKey).then(()=>{ mergeAndRender(id,todayKey); });
 }
 
 function mergeAndRender(id,todayKey){
-  const allSaves=getRecords().filter(r=>r.store===currentUser.store&&r.date===todayKey&&r.checklistId===id);
-  allSaves.slice().reverse().forEach(save=>{
+  const weekStart=mondayKeyOf(todayKey);
+  const clRecs=getRecords().filter(r=>r.store===currentUser.store&&r.checklistId===id).slice().sort((a,b)=>a.id-b.id);
+  const isWk={}; currentVisibleTasks.forEach(t=>{ isWk[t.name]=isWeeklyTask(t); });
+  // Layer saved statuses onto taskStates. Daily task: today only, last wins.
+  // Weekly task: Mon..today, EARLIEST completion in the week wins (so a later
+  // re-tick can't overwrite an on-time completion with a late one).
+  const firstId={};
+  clRecs.forEach(save=>{
     save.tasks.forEach(t=>{
-      if(taskStates[t.name] && t.status!=='pending'){
-        taskStates[t.name]={ status:t.status, note:t.note||'', temp:t.temp||'', photo:t.photo||null, hasPhoto:!!(t.photo||t.hasPhoto), signedBy:t.signedBy||save.staff, time: save.timestamp ? new Date(save.timestamp).toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'}) : '' };
-      }
+      if(!taskStates[t.name] || t.status==='pending') return;
+      const wk=isWk[t.name];
+      const inWindow = wk ? (save.date>=weekStart && save.date<=todayKey) : (save.date===todayKey);
+      if(!inWindow) return;
+      if(wk){ if(firstId[t.name]!==undefined) return; firstId[t.name]=save.id; }
+      taskStates[t.name]={ status:t.status, note:t.note||'', temp:t.temp||'', photo:t.photo||null, hasPhoto:!!(t.photo||t.hasPhoto), signedBy:t.signedBy||save.staff, time: save.timestamp ? new Date(save.timestamp).toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'}) : '' };
     });
   });
-  // Snapshot what's ALREADY recorded for each task, derived purely from saved
-  // records (not from in-progress edits). Submit uses this so it only sends
-  // tasks that are genuinely new or changed — leaving each already-done task's
-  // original completion time untouched instead of re-stamping it.
+  // Snapshot what's ALREADY recorded for each task (same window/rule), so submit
+  // only sends genuinely new or changed tasks and never re-stamps a completion
+  // already recorded earlier in the week.
   baselineSig={};
   currentVisibleTasks.forEach(t=>{ baselineSig[t.name]='pending||'; });
-  allSaves.slice().reverse().forEach(save=>{
+  const firstId2={};
+  clRecs.forEach(save=>{
     save.tasks.forEach(t=>{
-      if(baselineSig[t.name]!==undefined && t.status!=='pending'){
-        baselineSig[t.name]=t.status+'|'+(t.temp||'')+'|'+(t.note||'');
-      }
+      if(baselineSig[t.name]===undefined || t.status==='pending') return;
+      const wk=isWk[t.name];
+      const inWindow = wk ? (save.date>=weekStart && save.date<=todayKey) : (save.date===todayKey);
+      if(!inWindow) return;
+      if(wk){ if(firstId2[t.name]!==undefined) return; firstId2[t.name]=save.id; }
+      baselineSig[t.name]=t.status+'|'+(t.temp||'')+'|'+(t.note||'');
     });
   });
   renderTaskList();
@@ -1051,10 +1091,10 @@ function fetchDayRecordsJSONP(url, store, date, timeoutMs){
   });
 }
 
-async function syncFromSheets(store,dateKey){
+async function syncFromSheets(store,dateKey,fromKey){
   const url=PRECONFIGURED_WEBHOOK||getWebhook();if(!url)return;
   return new Promise((resolve)=>{
-    const callbackName='bb_sync_'+Date.now(); const src=url+'?store='+encodeURIComponent(store)+'&date='+dateKey+'&callback='+callbackName; const script=document.createElement('script');
+    const callbackName='bb_sync_'+Date.now(); const src=url+'?store='+encodeURIComponent(store)+'&date='+dateKey+(fromKey?('&from='+fromKey):'')+'&callback='+callbackName; const script=document.createElement('script');
     const timer=setTimeout(()=>{ cleanup();resolve(); },5000);
     window[callbackName]=function(remote){
       cleanup(); if(!Array.isArray(remote)||remote.length===0){resolve();return;}
@@ -1198,7 +1238,8 @@ function renderAudit(){
     let checklistsHtml = '';
 
     CHECKLISTS.forEach(cl => {
-      const vis = visibleTasks(cl, store, deptScope);
+      const weekStartA = mondayKeyOf(auditSelectedDate);
+      const vis = visibleTasks(cl, store, deptScope).filter(t=>isDueBy(t, auditSelectedDate, weekStartA));
       if (vis.length === 0) return;
 
       const clSaves = records.filter(r => r.store === store && r.date === auditSelectedDate && r.checklistId === cl.id);
@@ -1274,6 +1315,24 @@ function setAuditFilter(s){auditFilter=s;renderAudit();}
 function showLightboxSrc(src){document.getElementById('lightbox-img').src=src;document.getElementById('lightbox').style.display='flex';}
 function hideLightbox(){document.getElementById('lightbox').style.display='none';}
 function toDateKey(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+
+/* ── WEEKLY CHECKLIST SUPPORT (v1.7) ─────────────────────────────────────
+   A task is "weekly" when its Config row carries a Due Day (Mon–Sun, column M),
+   surfaced by the backend as task.dueDay. The week runs Monday→Sunday. Weekly
+   tasks are hidden until their due day, stay visible until done, are ticked on
+   the day the work is recorded (you can't tick early), keep the EARLIEST
+   completion in the week (so a later re-tick can't turn an on-time job late),
+   and reset every Monday because the week's records start empty. Tasks with a
+   blank Due Day are ordinary daily tasks and behave exactly as before. */
+const WEEKDAY_INDEX = { MON:0, TUE:1, WED:2, THU:3, FRI:4, SAT:5, SUN:6 };
+function dueDayIndex(t){ var d = (t && t.dueDay) ? String(t.dueDay).trim().slice(0,3).toUpperCase() : ''; return WEEKDAY_INDEX.hasOwnProperty(d) ? WEEKDAY_INDEX[d] : -1; }
+function isWeeklyTask(t){ return dueDayIndex(t) >= 0; }
+function isWeeklyChecklist(cl){ return !!(cl && cl.tasks && cl.tasks.some(isWeeklyTask)); }
+function mondayKeyOf(dateKey){ var p=dateKey.split('-'); var d=new Date(Number(p[0]),Number(p[1])-1,Number(p[2])); var off=(d.getDay()+6)%7; d.setDate(d.getDate()-off); return toDateKey(d); }
+function addDaysKey(dateKey,n){ var p=dateKey.split('-'); var d=new Date(Number(p[0]),Number(p[1])-1,Number(p[2])); d.setDate(d.getDate()+n); return toDateKey(d); }
+function dueDateKeyFor(t, weekStartKey){ var i=dueDayIndex(t); return i<0 ? null : addDaysKey(weekStartKey, i); }
+/* Daily → always available; weekly → only once its due day has arrived. */
+function isDueBy(t, todayKey, weekStartKey){ if(!isWeeklyTask(t)) return true; var due=dueDateKeyFor(t, weekStartKey); return due!==null && due<=todayKey; }
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),5000);}
 
 /* ── ON-DEMAND MANAGER REPORT ────────────────────────────────────────────
