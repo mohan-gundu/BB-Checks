@@ -111,7 +111,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .task-body h4{font-size:14px;font-weight:500;line-height:1.35;}
 .task-signed{font-size:11px;color:var(--ok);margin-top:4px;display:block;font-style:italic;}
 .task-flagged-note{font-size:11px;color:var(--danger);margin-top:4px;display:block;}
+.task-note{font-size:11px;color:var(--text-muted);margin-top:4px;display:block;}
 .task-photo-badge{font-size:10px;font-weight:700;color:var(--orange-dark);background:var(--orange-light);padding:2px 7px;border-radius:4px;margin-top:5px;display:inline-block;letter-spacing:0.3px;}
+.task-photo-badge.saved{color:var(--ok);background:rgba(58,140,92,0.14);}
 
 /* TEMP */
 .temp-row{display:flex;align-items:center;gap:8px;padding:0 14px 14px;flex-wrap:wrap;}
@@ -127,6 +129,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .photo-section{padding:0 14px 14px;}
 .photo-label{font-size:11px;font-weight:700;color:var(--orange-dark);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;display:flex;align-items:center;gap:6px;}
 .photo-label .req-badge{background:var(--orange);color:white;font-size:9px;padding:2px 6px;border-radius:3px;}
+.req-badge.saved{background:var(--ok);}
+.photo-onrecord{background:rgba(58,140,92,0.12);border:1.5px solid var(--ok);color:var(--ok);border-radius:10px;padding:12px 14px;font-size:13.5px;font-weight:700;display:flex;align-items:center;gap:8px;margin-top:4px;line-height:1.35;}
+.photo-onrecord .tick{font-size:18px;line-height:1;}
 .photo-trigger{display:flex;align-items:center;gap:10px;background:var(--orange-light);border:1.5px dashed var(--orange);border-radius:8px;padding:12px 14px;cursor:pointer;transition:background 0.15s;}
 .photo-trigger:active{background:#ffe0cc;}
 .photo-trigger span{font-size:13px;color:var(--orange-dark);font-weight:500;}
@@ -311,6 +316,31 @@ input[type="file"].photo-input{display:none;}
   </div>
 </div>
 
+<div class="modal-overlay" id="choice-modal" style="display:none" onclick="closeChoiceBg(event)">
+  <div class="modal">
+    <h3 id="choice-title">Update this task</h3>
+    <p>This task is already signed off. What would you like to do?</p>
+    <div class="modal-actions" style="flex-direction:column;gap:8px;align-items:stretch;">
+      <button class="btn btn-primary" onclick="chooseAddNote()">📝 Add a note</button>
+      <button class="btn btn-danger" onclick="chooseFlag()">⚠ Flag an issue</button>
+      <button class="btn btn-ghost" onclick="hideChoice()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="note-modal" style="display:none" onclick="closeNoteBg(event)">
+  <div class="modal">
+    <h3 id="note-title">Add a note</h3>
+    <div id="note-existing" style="font-size:12px;color:var(--text-muted);background:rgba(0,0,0,0.04);border-radius:8px;padding:8px 10px;margin-bottom:8px;white-space:pre-wrap;display:none;"></div>
+    <p>Add a comment. It's recorded against the task and does not change its status.</p>
+    <textarea id="note-input" placeholder="e.g. Photo saved earlier, all in order"></textarea>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="hideNote()">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmNote()">Save note</button>
+    </div>
+  </div>
+</div>
+
 <div class="lightbox" id="lightbox" style="display:none" onclick="hideLightbox()">
   <button class="lightbox-close" onclick="hideLightbox()">✕</button>
   <img id="lightbox-img" src="" alt="Evidence photo" />
@@ -355,8 +385,9 @@ let currentChecklist = null;
 let currentVisibleTasks = [];   // tasks visible for the current user+store, set when a checklist is opened
 let taskStates = {};
 let flagTarget = null;
+let noteTarget = null;
 let baselineSig = {};            // per-task signature already persisted when a checklist opens
-const APP_VERSION = 'v1.7';      // bump on each deploy — shown in-app for a quick hygiene check
+const APP_VERSION = 'v1.8';      // bump on each deploy — shown in-app for a quick hygiene check
 let auditFilter = 'all';
 let auditDeptFilter = 'all';
 let auditSelectedDate = '';
@@ -761,34 +792,33 @@ function mergeAndRender(id,todayKey){
   const clRecs=getRecords().filter(r=>r.store===currentUser.store&&r.checklistId===id).slice().sort((a,b)=>a.id-b.id);
   const isWk={}; currentVisibleTasks.forEach(t=>{ isWk[t.name]=isWeeklyTask(t); });
   // Layer saved statuses onto taskStates. Daily task: today only, last wins.
-  // Weekly task: Mon..today, EARLIEST completion in the week wins (so a later
-  // re-tick can't overwrite an on-time completion with a late one).
-  const firstId={};
+  // Weekly task: Mon..today, EARLIEST completion in the week drives status/time
+  // (so a later re-tick or note can't turn an on-time job late), but the LATEST
+  // non-empty note wins so an appended comment is the one shown.
+  const firstId={}; const latestWkNote={};
   clRecs.forEach(save=>{
     save.tasks.forEach(t=>{
       if(!taskStates[t.name] || t.status==='pending') return;
       const wk=isWk[t.name];
       const inWindow = wk ? (save.date>=weekStart && save.date<=todayKey) : (save.date===todayKey);
       if(!inWindow) return;
-      if(wk){ if(firstId[t.name]!==undefined) return; firstId[t.name]=save.id; }
+      if(wk){
+        if(t.note) latestWkNote[t.name]=t.note;   // ascending → last non-empty wins
+        if(firstId[t.name]!==undefined) return;   // earliest drives everything else
+        firstId[t.name]=save.id;
+      }
       taskStates[t.name]={ status:t.status, note:t.note||'', temp:t.temp||'', photo:t.photo||null, hasPhoto:!!(t.photo||t.hasPhoto), signedBy:t.signedBy||save.staff, time: save.timestamp ? new Date(save.timestamp).toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'}) : '' };
     });
   });
-  // Snapshot what's ALREADY recorded for each task (same window/rule), so submit
-  // only sends genuinely new or changed tasks and never re-stamps a completion
-  // already recorded earlier in the week.
+  Object.keys(latestWkNote).forEach(nm=>{ if(taskStates[nm]) taskStates[nm].note=latestWkNote[nm]; });
+
+  // Baseline = the persisted state just merged (no user edits yet), so submit
+  // only sends genuinely new or changed tasks and never re-stamps or re-notes
+  // something already recorded.
   baselineSig={};
-  currentVisibleTasks.forEach(t=>{ baselineSig[t.name]='pending||'; });
-  const firstId2={};
-  clRecs.forEach(save=>{
-    save.tasks.forEach(t=>{
-      if(baselineSig[t.name]===undefined || t.status==='pending') return;
-      const wk=isWk[t.name];
-      const inWindow = wk ? (save.date>=weekStart && save.date<=todayKey) : (save.date===todayKey);
-      if(!inWindow) return;
-      if(wk){ if(firstId2[t.name]!==undefined) return; firstId2[t.name]=save.id; }
-      baselineSig[t.name]=t.status+'|'+(t.temp||'')+'|'+(t.note||'');
-    });
+  currentVisibleTasks.forEach(t=>{
+    const s=taskStates[t.name];
+    baselineSig[t.name] = (s.status==='pending') ? 'pending||' : (s.status+'|'+(s.temp||'')+'|'+(s.note||''));
   });
   renderTaskList();
 }
@@ -803,9 +833,14 @@ function renderTaskList(){
     else chkHtml='<div class="task-check"></div>';
 
     let noteHtml='';
-    if(s.status==='ok') noteHtml=`<span class="task-signed">✓ Signed off — ${s.signedBy||currentUser.name}${s.time ? ` at ${s.time}` : ''}</span>`;
+    if(s.status==='ok'){
+      noteHtml=`<span class="task-signed">✓ Signed off — ${s.signedBy||currentUser.name}${s.time ? ` at ${s.time}` : ''}</span>`;
+      if(s.note) noteHtml+=`<span class="task-note">📝 ${s.note}</span>`;   // benign comment, doesn't change status
+    }
     if(s.status==='flag') noteHtml=`<span class="task-flagged-note">⚠ ${s.note||'Issue flagged'} (${s.signedBy||currentUser.name}${s.time ? ` at ${s.time}` : ''})</span>`;
-    if(task.requirePhoto) noteHtml+=`<span class="task-photo-badge">📷 PHOTO REQUIRED</span>`;
+    if(task.requirePhoto) noteHtml+= (s.photo||s.hasPhoto)
+      ? `<span class="task-photo-badge saved">📷 PHOTO ON RECORD</span>`
+      : `<span class="task-photo-badge">📷 PHOTO REQUIRED</span>`;
 
     let tempHtml='';
     if(task.type==='temp'){
@@ -825,14 +860,14 @@ function renderTaskList(){
     let photoHtml='';
     if(task.requirePhoto){
       photoHtml=`<div class="photo-section">
-        <div class="photo-label">Evidence photo <span class="req-badge">REQUIRED</span></div>
+        <div class="photo-label">Evidence photo ${(s.photo||s.hasPhoto) ? '<span class="req-badge saved">SAVED</span>' : '<span class="req-badge">REQUIRED</span>'}</div>
         ${s.photo
           ? `<div class="photo-preview">
                <img src="${s.photo}" alt="Evidence" onclick="showLightbox('${task.name.replace(/'/g, "\\'")}')"/>
                <button class="photo-remove" onclick="removePhoto('${task.name.replace(/'/g, "\\'")}')">✕</button>
              </div>`
           : s.hasPhoto
-          ? `<div style="font-size:12px;color:var(--ok);padding:6px 0;">✓ Photo saved earlier — on record</div>`
+          ? `<div class="photo-onrecord"><span class="tick">✓</span><span>Photo already saved and on record — you don't need to take it again.</span></div>`
           : `<label class="photo-trigger" for="photo_${task.name.replace(/\s+/g,'_')}">
                <span class="cam-icon">📷</span>
                <span>Tap to take photo or choose from library</span>
@@ -880,19 +915,72 @@ function wipeTemperatureEntryDirectly(name) {
 
 function handleTaskClick(name){
   const taskDef = currentVisibleTasks.find(t => t.name === name);
-  if (taskDef && taskDef.type === 'temp' && taskStates[name].status === 'pending') {
-    showToast("🌡️ Please type a numeric reading directly below to confirm this task"); return;
-  }
   const s = taskStates[name];
+  // Temperature tasks are driven entirely by the reading: their flags are
+  // automatic and irreversible, so re-tapping never offers note/flag — it just
+  // points back to the reading input.
+  if (taskDef && taskDef.type === 'temp') {
+    showToast(s.status === 'pending'
+      ? "🌡️ Please type a numeric reading directly below to confirm this task"
+      : "🌡️ Adjust the reading below if it needs correcting");
+    return;
+  }
   if(s.status === 'pending'){
     s.status = 'ok'; s.signedBy = currentUser.name; s.time = new Date().toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'});
     renderTaskList(); showToast('✓ Signed off');
   } else {
-    // A sign-off is final and cannot be unchecked back to blank. Re-tapping a
-    // completed task lets you raise or update a flag instead.
-    flagTarget = name; document.getElementById('modal-title').textContent = name;
-    document.getElementById('modal-note').value = s.note || ''; document.getElementById('modal').style.display = 'flex';
+    // Already signed off (ok or flag). A sign-off is final — instead of forcing
+    // a flag, offer a choice: add a benign note, or raise an issue.
+    openChoice(name);
   }
+}
+
+// Re-tap chooser: note vs flag. Fixes the trap where any comment became a flag.
+function openChoice(name){
+  flagTarget = name; noteTarget = name;
+  document.getElementById('choice-title').textContent = name;
+  document.getElementById('choice-modal').style.display = 'flex';
+}
+function hideChoice(){ document.getElementById('choice-modal').style.display='none'; }
+function closeChoiceBg(e){ if(e.target.id==='choice-modal') hideChoice(); }
+function chooseAddNote(){ hideChoice(); openNote(noteTarget); }
+function chooseFlag(){ hideChoice(); openFlag(flagTarget); }
+
+// Notes append (never overwrite); a joined string carries the running comment.
+function appendNoteText(existing, addition){
+  const add = (addition||'').trim();
+  if(!add) return existing||'';
+  return existing ? (existing + ' · ' + add) : add;
+}
+
+function openFlag(name){
+  flagTarget = name;
+  document.getElementById('modal-title').textContent = name;
+  document.getElementById('modal-note').value = '';
+  document.getElementById('modal').style.display = 'flex';
+}
+
+function openNote(name){
+  noteTarget = name;
+  const s = taskStates[name];
+  document.getElementById('note-title').textContent = name;
+  const ex = document.getElementById('note-existing');
+  if(s.note){ ex.style.display='block'; ex.textContent = s.note; } else { ex.style.display='none'; ex.textContent=''; }
+  document.getElementById('note-input').value='';
+  document.getElementById('note-modal').style.display='flex';
+}
+function hideNote(){ document.getElementById('note-modal').style.display='none'; noteTarget=null; }
+function closeNoteBg(e){ if(e.target.id==='note-modal') hideNote(); }
+
+// Add a note WITHOUT changing status. The completion sign-off (who/when) is
+// left untouched, so timing is unaffected — the note simply rides along.
+function confirmNote(){
+  if(!noteTarget) return;
+  const add = document.getElementById('note-input').value.trim();
+  if(!add){ hideNote(); return; }
+  const s = taskStates[noteTarget];
+  s.note = appendNoteText(s.note, add);   // status, signedBy, time unchanged
+  hideNote(); renderTaskList(); showToast('📝 Note added');
 }
 
 function setTemp(name,val,min,max){
@@ -963,7 +1051,7 @@ function submitChecklist(){
   // (ok / flag) are written to the sheet — pending rows are noise the reader
   // ignores anyway.
   const taskArr=currentVisibleTasks.map(t=>({
-    name:t.name, status:taskStates[t.name].status, note:taskStates[t.name].note, temp:taskStates[t.name].temp, photo:taskStates[t.name].photo||null, hasPhoto:!!taskStates[t.name].photo, signedBy:taskStates[t.name].status!=='pending'?currentUser.name:null
+    name:t.name, status:taskStates[t.name].status, note:taskStates[t.name].note, temp:taskStates[t.name].temp, photo:taskStates[t.name].photo||null, hasPhoto:!!(taskStates[t.name].photo||taskStates[t.name].hasPhoto), signedBy:taskStates[t.name].status!=='pending'?currentUser.name:null
   }));
   const actioned=taskArr.filter(t=>{
     const sig=t.status+'|'+(t.temp||'')+'|'+(t.note||'');
@@ -1112,8 +1200,11 @@ function closeModalBg(e){if(e.target.id==='modal')hideModal();}
 function hideModal(){document.getElementById('modal').style.display='none';flagTarget=null;}
 function confirmFlag(){
   if(!flagTarget)return;
-  const note=document.getElementById('modal-note').value.trim();
-  taskStates[flagTarget].status='flag'; taskStates[flagTarget].note=note||'Issue flagged'; taskStates[flagTarget].signedBy=currentUser.name; taskStates[flagTarget].time=new Date().toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'});
+  const add=document.getElementById('modal-note').value.trim();
+  const s=taskStates[flagTarget];
+  s.status='flag';
+  s.note=appendNoteText(s.note, add || 'Issue flagged');   // keep any earlier notes
+  s.signedBy=currentUser.name; s.time=new Date().toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'});
   hideModal(); renderTaskList(); showToast('⚠ Issue flagged');
 }
 
@@ -1246,13 +1337,16 @@ function renderAudit(){
       let taskMap = {};
       vis.forEach(t => { taskMap[t.name] = { status: 'pending', details: '✗ Pending', photo: null, timing: '' }; });
 
-      clSaves.slice().reverse().forEach(save => {
+      clSaves.slice().reverse().forEach(save => {   // oldest-first: the first sign-off sets timing
         save.tasks.forEach(t => {
           if (taskMap[t.name] && t.status !== 'pending') {  // only count tasks visible under the current store/dept scope
             let timePart = save.timestamp ? new Date(save.timestamp).toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'}) : '';
-            let timing = classifyTiming(save.timestamp, cl.dueMinutes, cl.dueEndMinutes);
+            // Keep the timing from the FIRST completion so a later note/re-save
+            // can't shift on-time → late.
+            let priorSet = (taskMap[t.name].status !== 'pending');
+            let timing = priorSet ? taskMap[t.name].timing : classifyTiming(save.timestamp, cl.dueMinutes, cl.dueEndMinutes);
             if (t.status === 'ok') {
-              taskMap[t.name] = { status: 'ok', details: `✓ Done by ${save.staff} ${timePart ? `at ${timePart}` : ''} ${t.temp ? `(${t.temp}°C)` : ''}`, photo: t.photo || null, timing: timing };
+              taskMap[t.name] = { status: 'ok', details: `✓ Done by ${save.staff} ${timePart ? `at ${timePart}` : ''} ${t.temp ? `(${t.temp}°C)` : ''}${t.note ? ` — 📝 ${t.note}` : ''}`, photo: t.photo || taskMap[t.name].photo || null, timing: timing };
             } else if (t.status === 'flag') {
               taskMap[t.name] = { status: 'flag', details: `! Flagged by ${save.staff} ${timePart ? `at ${timePart}` : ''}: ${t.note || 'Issue raised'}`, photo: t.photo || null, timing: timing };
             }
