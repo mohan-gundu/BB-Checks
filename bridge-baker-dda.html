@@ -387,7 +387,7 @@ let taskStates = {};
 let flagTarget = null;
 let noteTarget = null;
 let baselineSig = {};            // per-task signature already persisted when a checklist opens
-const APP_VERSION = 'v1.8';      // bump on each deploy — shown in-app for a quick hygiene check
+const APP_VERSION = 'v1.8.1';      // bump on each deploy — shown in-app for a quick hygiene check
 let auditFilter = 'all';
 let auditDeptFilter = 'all';
 let auditSelectedDate = '';
@@ -812,13 +812,31 @@ function mergeAndRender(id,todayKey){
   });
   Object.keys(latestWkNote).forEach(nm=>{ if(taskStates[nm]) taskStates[nm].note=latestWkNote[nm]; });
 
-  // Baseline = the persisted state just merged (no user edits yet), so submit
-  // only sends genuinely new or changed tasks and never re-stamps or re-notes
-  // something already recorded.
+  // Baseline = signature of what is genuinely PERSISTED, computed from the saved
+  // RECORDS only — never from taskStates, which also holds the ticks the user is
+  // entering right now. (v1.8 derived it from taskStates; when the background
+  // sync landed mid-entry it baked un-saved ticks into the baseline, so the next
+  // save skipped them — tasks looked done on the device but were never written.)
   baselineSig={};
-  currentVisibleTasks.forEach(t=>{
-    const s=taskStates[t.name];
-    baselineSig[t.name] = (s.status==='pending') ? 'pending||' : (s.status+'|'+(s.temp||'')+'|'+(s.note||''));
+  currentVisibleTasks.forEach(t=>{ baselineSig[t.name]='pending||'; });
+  const bFirst={};
+  clRecs.forEach(save=>{
+    save.tasks.forEach(t=>{
+      if(baselineSig[t.name]===undefined || t.status==='pending') return;
+      const wk=isWk[t.name];
+      const inWindow = wk ? (save.date>=weekStart && save.date<=todayKey) : (save.date===todayKey);
+      if(!inWindow) return;
+      if(wk){ if(bFirst[t.name]!==undefined) return; bFirst[t.name]=save.id; }  // earliest, mirrors display
+      baselineSig[t.name]=t.status+'|'+(t.temp||'')+'|'+(t.note||'');
+    });
+  });
+  // weekly: baseline note follows the LATEST note, mirroring the display merge,
+  // so a benign reopen with no edits still submits nothing.
+  Object.keys(latestWkNote).forEach(nm=>{
+    if(baselineSig[nm]!==undefined && baselineSig[nm]!=='pending||'){
+      const p=baselineSig[nm].split('|');           // status|temp|note
+      baselineSig[nm]=p[0]+'|'+(p[1]||'')+'|'+latestWkNote[nm];
+    }
   });
   renderTaskList();
 }
