@@ -387,7 +387,7 @@ let taskStates = {};
 let flagTarget = null;
 let noteTarget = null;
 let baselineSig = {};            // per-task signature already persisted when a checklist opens
-const APP_VERSION = 'v1.8.1';      // bump on each deploy — shown in-app for a quick hygiene check
+const APP_VERSION = 'v1.9.0';      // bump on each deploy — shown in-app for a quick hygiene check
 let auditFilter = 'all';
 let auditDeptFilter = 'all';
 let auditSelectedDate = '';
@@ -843,7 +843,28 @@ function mergeAndRender(id,todayKey){
 
 function renderTaskList(){
   const list=document.getElementById('task-list'); list.innerHTML='';
-  currentVisibleTasks.forEach(task=>{
+
+  // v1.9: for weekly checklists, pending tasks float to the top and completed
+  // ones drop below a divider — by Friday, staff no longer scroll past a
+  // week's worth of signed-off tasks to find what's still open. Daily
+  // checklists keep the original Config-sheet order (unchanged, still short-
+  // lived enough that this wasn't a problem). It's a display-only reorder —
+  // taskStates/currentVisibleTasks and everything that reads them (banner,
+  // submit, baseline) are untouched.
+  const weekly = isWeeklyChecklist(currentChecklist);
+  let tasksToRender = currentVisibleTasks;
+  let dividerBeforeIdx = -1;
+  if (weekly) {
+    const pending = currentVisibleTasks.filter(t => taskStates[t.name].status === 'pending');
+    const completed = currentVisibleTasks.filter(t => taskStates[t.name].status !== 'pending');
+    tasksToRender = pending.concat(completed);
+    if (pending.length > 0 && completed.length > 0) dividerBeforeIdx = pending.length;
+  }
+
+  tasksToRender.forEach((task, idx)=>{
+    if (idx === dividerBeforeIdx) {
+      list.innerHTML += `<div style="margin:14px 0 2px;padding-top:10px;border-top:1px solid var(--border);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);">Completed this week</div>`;
+    }
     const s=taskStates[task.name];
     let chkHtml='';
     if(s.status==='ok') chkHtml='<div class="task-check checked">✓</div>';
