@@ -387,7 +387,7 @@ let taskStates = {};
 let flagTarget = null;
 let noteTarget = null;
 let baselineSig = {};            // per-task signature already persisted when a checklist opens
-const APP_VERSION = 'v1.9.0';      // bump on each deploy — shown in-app for a quick hygiene check
+const APP_VERSION = 'v1.10.0';      // bump on each deploy — shown in-app for a quick hygiene check
 let auditFilter = 'all';
 let auditDeptFilter = 'all';
 let auditSelectedDate = '';
@@ -1489,7 +1489,7 @@ function openReportModal(){
 }
 function renderReportModeChips(){
   document.getElementById('rpt-mode-chips').innerHTML =
-    [['all','Full record'],['failures','Failures only']]
+    [['all','Full record'],['failures','Failures only'],['temp','Temperature log']]
       .map(([v,l]) => `<div class="filter-chip ${reportMode===v?'active':''}" onclick="setReportMode('${v}')">${l}</div>`).join('');
 }
 function setReportMode(v){ reportMode = v; renderReportModeChips(); }
