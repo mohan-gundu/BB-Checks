@@ -362,12 +362,29 @@ input[type="file"].photo-input{display:none;}
         </div>
       </div>
       <div>
+        <label style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:6px;">Store</label>
+        <div id="rpt-store-chips" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+      </div>
+      <div>
         <label style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:6px;">Report type</label>
         <div id="rpt-mode-chips" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
       </div>
       <p style="font-size:12px;color:var(--text-muted);margin:0;line-height:1.4;">Emailed to your address on file. Longer ranges arrive within a minute.</p>
       <button class="btn btn-primary" onclick="emailRangeReport()">Email report to me</button>
     </div>
+  </div>
+</div>
+
+<!-- Persistent report status: replaces a flashing toast for the "request →
+     confirmation" flow. Stays up while waiting (no auto-hide), and once
+     resolved requires an explicit Close tap rather than fading away on its
+     own — so a manager who glances away mid-request can't miss the result. -->
+<div class="modal-overlay" id="report-status-modal" style="display:none;">
+  <div class="modal" style="text-align:center;">
+    <div id="report-status-icon" style="font-size:42px;line-height:1;margin-bottom:10px;">⏳</div>
+    <h3 id="report-status-title" style="font-size:19px;margin-bottom:8px;">Requesting report…</h3>
+    <p id="report-status-message" style="font-size:15px;line-height:1.5;color:var(--text-muted);">This can take up to 30 seconds — please keep this open.</p>
+    <button class="btn btn-primary" id="report-status-close-btn" style="display:none;margin-top:16px;" onclick="hideReportStatusModal()">Close</button>
   </div>
 </div>
 
@@ -387,7 +404,7 @@ let taskStates = {};
 let flagTarget = null;
 let noteTarget = null;
 let baselineSig = {};            // per-task signature already persisted when a checklist opens
-const APP_VERSION = 'v1.10.0';      // bump on each deploy — shown in-app for a quick hygiene check
+const APP_VERSION = 'v1.13.0';      // bump on each deploy — shown in-app for a quick hygiene check
 let auditFilter = 'all';
 let auditDeptFilter = 'all';
 let auditSelectedDate = '';
@@ -1479,12 +1496,15 @@ let reportCheckType = 'all';   // 'all' | 'temp'
 let reportDetail = 'summary';  // 'summary' | 'full'
 
 let reportMode = 'all';
+let reportStoreFilter = 'all';   // 'all' or a specific store name — applies to every mode
 function openReportModal(){
   const today = toDateKey(new Date());
   document.getElementById('rpt-from').value = today;
   document.getElementById('rpt-to').value = today;
   reportMode = 'all';
+  reportStoreFilter = 'all';
   renderReportModeChips();
+  renderReportStoreChips();
   document.getElementById('report-modal').style.display = 'flex';
 }
 function renderReportModeChips(){
@@ -1493,6 +1513,30 @@ function renderReportModeChips(){
       .map(([v,l]) => `<div class="filter-chip ${reportMode===v?'active':''}" onclick="setReportMode('${v}')">${l}</div>`).join('');
 }
 function setReportMode(v){ reportMode = v; renderReportModeChips(); }
+
+// Store filter for the report modal — applies to every mode. 'all' pulls
+// every store's data as before; a specific store means that store's data is
+// the only thing the backend ever reads for this report (see
+// targetStoresFromParam server-side), so sharing one store's report to an
+// inspector genuinely never includes the other two.
+function renderReportStoreChips(){
+  const stores = [['all','All'], ...REPORT_STORES.map(s => [s, s])];
+  document.getElementById('rpt-store-chips').innerHTML =
+    stores.map(([v,l]) => `<div class="filter-chip ${reportStoreFilter===v?'active':''}" onclick="setReportStoreFilter('${v.replace(/'/g,"\\'")}')">${l}</div>`).join('');
+}
+function setReportStoreFilter(v){ reportStoreFilter = v; renderReportStoreChips(); }
+
+// Persistent report status modal — replaces a flashing toast for this flow.
+// state: 'loading' | 'success' | 'error'. Loading has no Close button (can't
+// be dismissed early); success/error show one and require an explicit tap.
+function showReportStatusModal(state, title, message){
+  document.getElementById('report-status-icon').textContent = state === 'loading' ? '⏳' : (state === 'success' ? '✅' : '⚠️');
+  document.getElementById('report-status-title').textContent = title;
+  document.getElementById('report-status-message').textContent = message || '';
+  document.getElementById('report-status-close-btn').style.display = (state === 'loading') ? 'none' : 'block';
+  document.getElementById('report-status-modal').style.display = 'flex';
+}
+function hideReportStatusModal(){ document.getElementById('report-status-modal').style.display = 'none'; }
 
 // Range reports are built SERVER-SIDE and emailed to the manager's own address
 // (resolved from the Staff sheet — no recipient is entered on the device).
@@ -1503,20 +1547,21 @@ async function emailRangeReport(){
   const url = PRECONFIGURED_WEBHOOK || getWebhook();
   if(!url){ showToast('No connection configured'); return; }
   closeReportModal();
-  showToast('⏳ Requesting report…');
+  showReportStatusModal('loading', 'Requesting report…', 'This can take up to 30 seconds — please keep this open.');
   const cb = 'bb_rpt_' + Date.now();
   const script = document.createElement('script');
-  const timer = setTimeout(()=>{ cleanup(); showToast('⚠ Request timed out — check signal and try again'); }, 30000);
+  const timer = setTimeout(()=>{ cleanup(); showReportStatusModal('error', 'Request timed out', 'Check your signal and try again.'); }, 30000);
   window[cb] = function(res){
     cleanup();
-    if(res && res.status === 'ok'){ showToast('✓ Report on its way to your email'); }
-    else if(res && res.status === 'no-email'){ showToast('⚠ No report email set for your profile — add one in the Staff sheet'); }
-    else { showToast('⚠ ' + ((res && res.message) || 'Could not send report')); }
+    if(res && res.status === 'ok'){ showReportStatusModal('success', 'Report sent', 'Check your email — it\'s on its way.'); }
+    else if(res && res.status === 'no-email'){ showReportStatusModal('error', 'No report email set', 'Add one for your profile in the Staff sheet.'); }
+    else { showReportStatusModal('error', 'Could not send report', (res && res.message) || 'Please try again.'); }
   };
   function cleanup(){ clearTimeout(timer); try{delete window[cb];}catch(e){} if(script.parentNode) script.parentNode.removeChild(script); }
-  script.onerror = ()=>{ cleanup(); showToast('⚠ Could not reach the report service'); };
+  script.onerror = ()=>{ cleanup(); showReportStatusModal('error', 'Could not reach the report service', 'Check your connection and try again.'); };
   const mgr = encodeURIComponent(currentUser && currentUser.name ? currentUser.name : '');
-  script.src = url + '?action=emailReport&from=' + from + '&to=' + to + '&mode=' + reportMode + '&manager=' + mgr + '&callback=' + cb;
+  const storeParam = encodeURIComponent(reportStoreFilter === 'all' ? '' : reportStoreFilter);
+  script.src = url + '?action=emailReport&from=' + from + '&to=' + to + '&mode=' + reportMode + '&store=' + storeParam + '&manager=' + mgr + '&callback=' + cb;
   document.head.appendChild(script);
 }
 function closeReportModal(){ document.getElementById('report-modal').style.display = 'none'; }
