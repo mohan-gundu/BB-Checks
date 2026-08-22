@@ -404,7 +404,7 @@ let taskStates = {};
 let flagTarget = null;
 let noteTarget = null;
 let baselineSig = {};            // per-task signature already persisted when a checklist opens
-const APP_VERSION = 'v1.13.0';      // bump on each deploy — shown in-app for a quick hygiene check
+const APP_VERSION = 'v1.14.0';      // bump on each deploy — shown in-app for a quick hygiene check
 let auditFilter = 'all';
 let auditDeptFilter = 'all';
 let auditSelectedDate = '';
@@ -1157,6 +1157,7 @@ async function submitToSheetsConfirmed(rec, actioned){
         const covered=actioned.every(a=>prev.tasks.some(p=>p.name===a.name&&p.status===a.status&&String(p.temp||'')===String(a.temp||'')&&String(p.note||'')===String(a.note||'')));
         if(covered){
           if(btn){ btn.disabled=false; btn.style.opacity='1'; btn.textContent=prevBtn||'Submit checklist ✓'; }
+          console.log('[BB] submit confirm: earlier attempt already landed, nothing new to post');
           showToast('✓ Saved — your earlier submit had gone through');
           showScreen('screen-home');
           return;
@@ -1177,11 +1178,19 @@ async function submitToSheetsConfirmed(rec, actioned){
     // Drive), so the first wait scales with how many were sent.
     const photoCount=actioned.filter(t=>t.photo).length;
     const delays=[1500+2500*Math.min(photoCount,4), 3000, 5000, 8000, 12000];
+    let attempts=0;
     for(let i=0;i<delays.length && !landed;i++){
       await sleepMs(delays[i]);
+      attempts++;
       landed=await confirmWriteLanded(url, rec, 8000);
       if(!landed && banner) banner.textContent='Saving… still confirming ('+(i+1)+' of '+delays.length+')';
     }
+    // (v1.14) Browser console only — this is client-side timing data the
+    // server never sees, so it can't go in the Apps Script Executions log.
+    // Open devtools (F12) after a slow save to check whether it took several
+    // attempts (points at the confirmation polling itself) or just one
+    // (points at the initial POST/photo-upload being the slow part).
+    console.log('[BB] submit confirm: photos=' + photoCount + ' attempts=' + attempts + ' landed=' + landed);
   }
 
   if(btn){ btn.disabled=false; btn.style.opacity='1'; btn.textContent=prevBtn||'Submit checklist ✓'; }
