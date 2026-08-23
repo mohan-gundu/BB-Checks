@@ -404,7 +404,7 @@ let taskStates = {};
 let flagTarget = null;
 let noteTarget = null;
 let baselineSig = {};            // per-task signature already persisted when a checklist opens
-const APP_VERSION = 'v1.14.0';      // bump on each deploy — shown in-app for a quick hygiene check
+const APP_VERSION = 'v1.15.0';      // bump on each deploy — shown in-app for a quick hygiene check
 let auditFilter = 'all';
 let auditDeptFilter = 'all';
 let auditSelectedDate = '';
@@ -474,7 +474,15 @@ function showScreen(id){
   if(id==='screen-home') {
     renderHome();
     const todayKey=toDateKey(new Date());
-    syncFromSheets(currentUser.store,todayKey,mondayKeyOf(todayKey)).then(()=>{
+    // (v1.15) Only pull the whole week when this user actually has a weekly
+    // task in scope. Previously EVERY home-screen visit — login, after each
+    // submit, every back-out of a checklist — fetched Mon→today, which grew
+    // through the week (one day's rows on Monday, six or seven by Sunday) and
+    // was the main cause of slow 4–8s reads that got worse as the week went
+    // on. A store with no weekly tasks due now costs a single-day read.
+    const weekStart=mondayKeyOf(todayKey);
+    const needsWeek=homeNeedsWeekWindow(todayKey, weekStart);
+    syncFromSheets(currentUser.store,todayKey,needsWeek?weekStart:todayKey).then(()=>{
       renderHome();
     });
   }
@@ -1177,7 +1185,14 @@ async function submitToSheetsConfirmed(rec, actioned){
     // Step 3: confirm, patiently. Photos slow the server (each is uploaded to
     // Drive), so the first wait scales with how many were sent.
     const photoCount=actioned.filter(t=>t.photo).length;
-    const delays=[1500+2500*Math.min(photoCount,4), 3000, 5000, 8000, 12000];
+    // (v1.15) Rebalanced. Previously the FIRST wait scaled hard with photo
+    // count — 1500+2500*4 = 11.5s before even checking — so a 4-photo closing
+    // checklist sat there for ~14s minimum even when the write had actually
+    // landed in 2s. Now we check early and back off gradually: a fast save is
+    // confirmed in ~2s, while total patience across all attempts is still
+    // ~30s for the genuinely slow photo-heavy cases. Photo count still nudges
+    // the first wait, just far more gently.
+    const delays=[1500+500*Math.min(photoCount,4), 2500, 4000, 6000, 8000, 10000];
     let attempts=0;
     for(let i=0;i<delays.length && !landed;i++){
       await sleepMs(delays[i]);
@@ -1492,6 +1507,21 @@ function addDaysKey(dateKey,n){ var p=dateKey.split('-'); var d=new Date(Number(
 function dueDateKeyFor(t, weekStartKey){ var i=dueDayIndex(t); return i<0 ? null : addDaysKey(weekStartKey, i); }
 /* Daily → always available; weekly → only once its due day has arrived. */
 function isDueBy(t, todayKey, weekStartKey){ if(!isWeeklyTask(t)) return true; var due=dueDateKeyFor(t, weekStartKey); return due!==null && due<=todayKey; }
+/* (v1.15) Does the home screen actually need the whole Mon→today window, or
+   will today alone do? Only weekly tasks need earlier days pulled (to show as
+   already ticked); if none are visible and due for this user+store right now,
+   a single-day read is enough and far cheaper. Mirrors exactly the filtering
+   renderHome() itself applies, so the two can't disagree about what's on
+   screen. Monday is also a natural single-day case: weekStart === todayKey. */
+function homeNeedsWeekWindow(todayKey, weekStartKey){
+  if(!CHECKLISTS || !CHECKLISTS.length) return false;
+  if(weekStartKey===todayKey) return false;      // Monday — the week IS today
+  const depts=effectiveDepartments();
+  return CHECKLISTS.some(cl =>
+    visibleTasks(cl, currentUser.store, depts)
+      .some(t => isWeeklyTask(t) && isDueBy(t, todayKey, weekStartKey))
+  );
+}
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),5000);}
 
 /* ── ON-DEMAND MANAGER REPORT ────────────────────────────────────────────
