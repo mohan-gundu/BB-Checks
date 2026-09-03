@@ -162,6 +162,10 @@ input[type="file"].photo-input{display:none;}
 .cal-day-lbl{font-size:11px;font-weight:700;color:var(--text-muted);padding:4px 0;}
 .cal-cell{padding:8px 0;font-size:13px;border-radius:6px;cursor:pointer;font-weight:500;}
 .cal-cell.disabled{opacity:0.25;cursor:not-allowed;pointer-events:none;}
+/* (v1.18) Dimmed like .disabled, but still tappable — these dates can't be
+   opened, yet tapping explains why rather than doing nothing at all. */
+.cal-cell.explainable{opacity:0.45;cursor:pointer;}
+.cal-cell.explainable:active{background:var(--grey-light);opacity:0.7;}
 .cal-cell.has-logs{background:var(--orange-light);color:var(--orange-dark);font-weight:700;border:1px solid #ffc89a;}
 .cal-cell.selected-date{background:var(--brown) !important;color:white !important;border-color:var(--brown) !important;}
 
@@ -301,6 +305,7 @@ input[type="file"].photo-input{display:none;}
       <button class="header-btn" style="padding:4px 10px;" onclick="closeCalendarPickerModal()">Close</button>
     </div>
     <div class="cal-grid" id="cal-grid-target"></div>
+    <p id="cal-note" style="font-size:11.5px;line-height:1.45;color:var(--text-muted);margin-top:12px;border-top:1px solid var(--border);padding-top:10px;"></p>
   </div>
 </div>
 
@@ -404,7 +409,7 @@ let taskStates = {};
 let flagTarget = null;
 let noteTarget = null;
 let baselineSig = {};            // per-task signature already persisted when a checklist opens
-const APP_VERSION = 'v1.15.0';      // bump on each deploy — shown in-app for a quick hygiene check
+const APP_VERSION = 'v1.18.0';      // bump on each deploy — shown in-app for a quick hygiene check
 let auditFilter = 'all';
 let auditDeptFilter = 'all';
 let auditSelectedDate = '';
@@ -457,8 +462,16 @@ function classifyTiming(timestampISO, dueMin, dueEndMin){
   return 'ontime';
 }
 
+/* (v1.17) Normalises a roster entry's name for matching. The backend now
+   trims displayAs, but a device may still be holding an older cached roster
+   (bb_init_cache) built before that fix, so normalise on this side too —
+   otherwise a stray space in the sheet reproduces the "Name not found"
+   lockout until the cache happens to refresh. Also guards against a name
+   that isn't a string (e.g. a numeric "Display As"), which would throw. */
+function rosterName(u){ return String((u && u.displayAs) || '').trim().toLowerCase(); }
+
 function checkManagerRosterBypass(val) {
-  const matched = STAFF_ROSTER.find(u => u.displayAs.toLowerCase() === val.trim().toLowerCase());
+  const matched = STAFF_ROSTER.find(u => rosterName(u) === val.trim().toLowerCase());
   const rowField = document.getElementById('store-dropdown-field');
   if (matched && matched.role === 'manager') {
     rowField.style.display = 'none';
@@ -504,7 +517,7 @@ function doLogin(){
 
   if(!nameInput){showToast('Please type or select your name');return;}
 
-  const matchedUser = STAFF_ROSTER.find(u => u.displayAs.toLowerCase() === nameInput.toLowerCase());
+  const matchedUser = STAFF_ROSTER.find(u => rosterName(u) === nameInput.toLowerCase());
   if(!matchedUser) {
     showToast('❌ Name not found. Pick from the suggested dropdown list.');
     return;
@@ -659,7 +672,11 @@ function fetchLoggedDates(){
   const url=PRECONFIGURED_WEBHOOK||getWebhook(); if(!url) return;
   const cb='bb_dates_'+Date.now();
   const script=document.createElement('script');
-  const timer=setTimeout(()=>cleanup(),8000);
+  // (v1.17) 8s → 15s. The bounded getLoggedDates should now return in ~1–2s,
+  // but an Apps Script cold start can eat several seconds on its own, and a
+  // timeout here fails silently — LOGGED_DATES stays empty and the whole
+  // audit calendar greys out with no indication why. Cheap headroom.
+  const timer=setTimeout(()=>cleanup(),15000);
   window[cb]=function(dates){
     cleanup();
     if(Array.isArray(dates)){
@@ -1288,6 +1305,39 @@ function confirmFlag(){
   hideModal(); renderTaskList(); showToast('⚠ Issue flagged');
 }
 
+// (v1.18) The on-screen day view has always been limited to the last 7 days,
+// with anything older going out as an emailed report — but the modal gave no
+// hint of that. It was titled "<Month> Logs", rendered the whole month, and
+// simply made older cells non-clickable (no onclick at all, pointer-events
+// none), so tapping 15 August did literally nothing. The one explanatory
+// message that existed sat in handleCalendarDateClick, which those cells
+// could never reach — dead code. It read as a bug rather than a policy.
+// Now: the rule is stated up front, and every non-openable cell explains
+// itself when tapped, in-modal (a toast would render behind the overlay,
+// which sits at a higher z-index).
+const AUDIT_DAY_WINDOW = 7;   // days back the on-screen day view can open
+
+function setCalNote(msg, emphasis){
+  const el = document.getElementById('cal-note');
+  if(!el) return;
+  el.innerHTML = msg;
+  el.style.color = emphasis ? 'var(--orange-dark)' : 'var(--text-muted)';
+}
+function calDefaultNote(){
+  setCalNote('Only the last ' + AUDIT_DAY_WINDOW + ' days can be opened here. For older dates, use <strong>Report</strong> — it\'s emailed to you.', false);
+}
+// Tapped a date that can't be opened — say why, and leave the modal open so
+// another date can be picked straight away.
+function explainCalendarDate(dateKey, reason){
+  if(reason==='old') setCalNote('<strong>' + formatToHumanDate(dateKey) + '</strong> is older than ' + AUDIT_DAY_WINDOW + ' days, so it can\'t be opened on screen. Close this and tap <strong>Report</strong> to have that date emailed to you.', true);
+  // Distinguish "genuinely nothing logged" from "we never got the list".
+  // If LOGGED_DATES is empty the app simply doesn't know, and saying "no
+  // checks were logged" would be a confident lie — which is exactly how the
+  // greyed-out-calendar bug presented before v1.17 bounded that read.
+  else if(reason==='nodata' && (!LOGGED_DATES || LOGGED_DATES.length===0)) setCalNote('Couldn\'t load the list of logged dates — check your connection and reopen this calendar.', true);
+  else if(reason==='nodata') setCalNote('No checks were logged on <strong>' + formatToHumanDate(dateKey) + '</strong>.', true);
+}
+
 function openCalendarPickerModal() {
   const modal = document.getElementById('cal-modal');
   const targetGrid = document.getElementById('cal-grid-target');
@@ -1296,6 +1346,7 @@ function openCalendarPickerModal() {
   const now = new Date();
   title.textContent = now.toLocaleString('en-GB', { month: 'long', year: 'numeric' }) + " Logs";
   targetGrid.innerHTML = '';
+  calDefaultNote();
 
   const labels = ['Su','Mo','Tu','We','Th','Fr','Sa'];
   labels.forEach(l => { targetGrid.innerHTML += `<div class="cal-day-lbl">${l}</div>`; });
@@ -1305,20 +1356,33 @@ function openCalendarPickerModal() {
 
   for (let i = 0; i < firstDayIndex; i++) { targetGrid.innerHTML += `<div></div>`; }
 
+  const todayKey = toDateKey(new Date());
   for (let day = 1; day <= totalDaysInMonth; day++) {
     const curDate = new Date(now.getFullYear(), now.getMonth(), day);
     const dateKeyStr = toDateKey(curDate);
     const hasData = LOGGED_DATES.includes(dateKeyStr);
-    const isToday = dateKeyStr === toDateKey(new Date());
+    const isToday = dateKeyStr === todayKey;
     const isSelected = dateKeyStr === auditSelectedDate;
-    const daysAgo = Math.round((new Date(toDateKey(new Date()) + 'T00:00:00') - curDate) / 86400000);
-    const tooOld = daysAgo > 7;   // on-screen day view is limited to the last 7 days
+    const daysAgo = Math.round((new Date(todayKey + 'T00:00:00') - curDate) / 86400000);
+    const isFuture = daysAgo < 0;
+    const tooOld = daysAgo > AUDIT_DAY_WINDOW;
 
     const openable = (hasData || isToday) && !tooOld;
-    let cellClass = openable ? "cal-cell has-logs" : "cal-cell disabled";
+    // Future dates stay inert and silent — nothing to explain about a day
+    // that hasn't happened. Everything else is tappable, either to open or
+    // to say why it can't be.
+    let cellClass, clickAttr = '';
+    if (openable) {
+      cellClass = 'cal-cell has-logs';
+      clickAttr = `onclick="handleCalendarDateClick('${dateKeyStr}')"`;
+    } else if (isFuture) {
+      cellClass = 'cal-cell disabled';
+    } else {
+      cellClass = 'cal-cell explainable';
+      clickAttr = `onclick="explainCalendarDate('${dateKeyStr}','${tooOld ? 'old' : 'nodata'}')"`;
+    }
     if (isSelected) cellClass += " selected-date";
 
-    const clickAttr = openable ? `onclick="handleCalendarDateClick('${dateKeyStr}')"` : '';
     targetGrid.innerHTML += `<div class="${cellClass}" ${clickAttr}>${day}</div>`;
   }
   modal.style.display = 'flex';
@@ -1355,9 +1419,13 @@ function fetchAuditDay(dateKey, patient){
 }
 
 function handleCalendarDateClick(dateKey) {
-  closeCalendarPickerModal();
+  // (v1.18) Only openable dates reach this now — anything too old or without
+  // logs is routed to explainCalendarDate() instead, which leaves the modal
+  // open so another date can be picked. The old guard here was unreachable:
+  // non-openable cells carried no onclick at all.
   const daysAgo = Math.round((new Date(toDateKey(new Date()) + 'T00:00:00') - new Date(dateKey + 'T00:00:00')) / 86400000);
-  if (daysAgo > 7) { showToast('📄 Older than 7 days — use Report (emailed to you)'); return; }
+  if (daysAgo > AUDIT_DAY_WINDOW) { explainCalendarDate(dateKey, 'old'); return; }   // belt-and-braces
+  closeCalendarPickerModal();
   fetchAuditDay(dateKey, true);
 }
 
