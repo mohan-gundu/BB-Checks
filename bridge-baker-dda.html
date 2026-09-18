@@ -6,21 +6,36 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Bridge Baker">
-<meta name="theme-color" content="#5a5242">
+<meta name="theme-color" content="#E4DBC6">
 <title>Bridge Baker — Daily Checks</title>
+<!-- (v2.0) BB monogram, embedded so the app needs no external files (it is
+     served as a single static HTML file). Orange on white for the home-screen
+     icon: iOS renders transparency as black, so that one must be opaque; the
+     browser favicon keeps its transparency to suit light or dark chrome. -->
+<link rel="apple-touch-icon" href="data:image/png;base64,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">
+<link rel="icon" type="image/png" href="data:image/png;base64,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">
 <style>
 :root {
-  --orange:      #ff8038;
-  --orange-light:#fff0e6;
-  --orange-dark: #cc5a1a;
-  --brown:       #5a5242;
-  --brown-light: #f5f3f0;
-  --grey:        #dbd5cd;
-  --grey-light:  #f7f5f3;
-  --grey-dark:   #9e9890;
-  --text:        #2a2520;
-  --text-muted:  #7a7468;
-  --border:      #dbd5cd;
+  /* (v2.0) Brand refresh. Warm Cream #E4DBC6 and Orange #f47521 come from the
+     brand sheet; brown #4e4034 is the lettering colour.
+     Note on the orange: at ~2:1 against cream (and ~2.8:1 as white-on-orange)
+     it is below accessibility minimums for text, so it is used as an ACCENT
+     only — borders, progress fill, status, badges, active chips. Primary
+     buttons use brown, which lands at ~7.2:1 on cream and stays legible on a
+     phone in a bright kitchen. */
+  --orange:      #f47521;
+  --orange-light:#fdead9;
+  --orange-dark: #c25a12;
+  --brown:       #4e4034;
+  --brown-light: #f3eee6;
+  --cream:       #E4DBC6;
+  --cream-deep:  #d8cdb4;
+  --grey:        #cfc4ab;
+  --grey-light:  #efe9dc;
+  --grey-dark:   #9b917e;
+  --text:        #4e4034;
+  --text-muted:  #6b5f49;   /* darkened for AA on cream (was #7d7059 at 3.52:1) */
+  --border:      #cfc4ab;
   --surface:     #ffffff;
   --ok:          #3a8c5c;
   --ok-light:    #eaf5ee;
@@ -32,26 +47,26 @@
   --radius-lg:   14px;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--grey-light);color:var(--text);min-height:100vh;font-size:15px;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--cream);color:var(--text);min-height:100vh;font-size:15px;}
 .screen{display:none;min-height:100vh;flex-direction:column;}
 .screen.active{display:flex;}
 
 /* HEADER */
-.header{background:var(--brown);color:white;padding:14px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:100;}
-.header-back{background:none;border:none;color:white;font-size:24px;cursor:pointer;padding:0 4px 0 0;line-height:1;}
+.header{background:var(--cream);color:var(--brown);padding:14px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:100;border-bottom:1.5px solid var(--cream-deep);}
+.header-back{background:none;border:none;color:var(--brown);font-size:24px;cursor:pointer;padding:0 4px 0 0;line-height:1;}
 .header h1{font-size:17px;font-weight:600;flex:1;letter-spacing:-0.2px;}
 .header-sub{font-size:11px;opacity:0.7;display:block;font-weight:400;margin-top:1px;}
-.header-btn{background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);color:white;padding:6px 12px;border-radius:7px;font-size:13px;cursor:pointer;font-weight:500;}
-.header-btn.accent{background:var(--orange);border-color:var(--orange-dark);}
+.header-btn{background:var(--surface);border:1.5px solid var(--cream-deep);color:var(--brown);padding:6px 12px;border-radius:7px;font-size:13px;cursor:pointer;font-weight:600;}
+.header-btn.accent{background:var(--orange);border-color:var(--orange-dark);color:#fff;}
 .header-btn:active{opacity:0.8;}
 
 /* LOGIN */
-#screen-login{background:var(--brown);justify-content:center;align-items:center;padding:28px 20px;}
-.login-logo{text-align:center;color:white;margin-bottom:36px;}
+#screen-login{background:var(--cream);justify-content:center;align-items:center;padding:28px 20px;}
+.login-logo{text-align:center;color:var(--brown);margin-bottom:36px;}
 .login-logo .logo-title{font-size:26px;font-weight:700;letter-spacing:-0.5px;line-height:1.1;}
 .login-logo .logo-orange{color:var(--orange);}
-.login-logo .logo-sub{font-size:13px;opacity:0.65;margin-top:6px;letter-spacing:0.5px;text-transform:uppercase;}
-.login-card{background:var(--surface);border-radius:var(--radius-lg);padding:24px;width:100%;max-width:360px;box-shadow:0 4px 24px rgba(0,0,0,0.18);}
+.login-logo .logo-sub{font-size:13px;opacity:0.7;margin-top:6px;letter-spacing:0.5px;text-transform:uppercase;}
+.login-card{background:var(--surface);border-radius:var(--radius-lg);padding:24px;width:100%;max-width:360px;box-shadow:0 6px 24px rgba(78,64,52,0.14);border:1.5px solid var(--cream-deep);}
 .login-card h2{font-size:15px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:18px;}
 .field{margin-bottom:14px;}
 .field label{display:block;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px;}
@@ -60,16 +75,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .field select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%239e9890' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:38px;}
 .btn{width:100%;padding:13px;border:none;border-radius:9px;font-size:15px;font-weight:600;cursor:pointer;transition:opacity 0.15s,transform 0.1s;letter-spacing:-0.1px;}
 .btn:active{opacity:0.85;transform:scale(0.99);}
-.btn-primary{background:var(--orange);color:white;}
-.btn-brown{background:var(--brown);color:white;margin-top:10px;}
-.btn-ghost{background:var(--grey-light);color:var(--text);border:1.5px solid var(--border);margin-top:8px;}
+.btn-primary{background:var(--brown);color:#fff;}
+.btn-brown{background:var(--brown);color:#fff;margin-top:10px;}
+.btn-ghost{background:var(--surface);color:var(--brown);border:1.5px solid var(--border);margin-top:8px;}
 .btn-danger{background:var(--danger);color:white;}
 
 /* HOME */
 .home-greeting{padding:16px 16px 0;}
 .home-greeting p{font-size:13px;color:var(--text-muted);}
 .home-greeting strong{color:var(--text);}
-.date-badge{display:inline-block;background:var(--orange-light);color:var(--orange-dark);padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;margin-top:6px;letter-spacing:0.2px;}
+.date-badge{display:inline-block;background:var(--surface);color:var(--brown);border:1.5px solid var(--cream-deep);padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;margin-top:6px;letter-spacing:0.2px;}
 .section-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--text-muted);padding:18px 16px 8px;}
 .status-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 16px;}
 .stat-card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:12px 8px;text-align:center;}
@@ -112,7 +127,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .task-signed{font-size:11px;color:var(--ok);margin-top:4px;display:block;font-style:italic;}
 .task-flagged-note{font-size:11px;color:var(--danger);margin-top:4px;display:block;}
 .task-note{font-size:11px;color:var(--text-muted);margin-top:4px;display:block;}
-.task-photo-badge{font-size:10px;font-weight:700;color:var(--orange-dark);background:var(--orange-light);padding:2px 7px;border-radius:4px;margin-top:5px;display:inline-block;letter-spacing:0.3px;}
+.task-photo-badge{font-size:10px;font-weight:700;color:var(--brown);background:var(--orange-light);padding:2px 7px;border-radius:4px;margin-top:5px;display:inline-block;letter-spacing:0.3px;}
 .task-photo-badge.saved{color:var(--ok);background:rgba(58,140,92,0.14);}
 
 /* TEMP */
@@ -127,14 +142,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
 /* PHOTO */
 .photo-section{padding:0 14px 14px;}
-.photo-label{font-size:11px;font-weight:700;color:var(--orange-dark);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;display:flex;align-items:center;gap:6px;}
-.photo-label .req-badge{background:var(--orange);color:white;font-size:9px;padding:2px 6px;border-radius:3px;}
+.photo-label{font-size:11px;font-weight:700;color:var(--brown);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;display:flex;align-items:center;gap:6px;}
+.photo-label .req-badge{background:var(--brown);color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:3px;}
 .req-badge.saved{background:var(--ok);}
 .photo-onrecord{background:rgba(58,140,92,0.12);border:1.5px solid var(--ok);color:var(--ok);border-radius:10px;padding:12px 14px;font-size:13.5px;font-weight:700;display:flex;align-items:center;gap:8px;margin-top:4px;line-height:1.35;}
 .photo-onrecord .tick{font-size:18px;line-height:1;}
 .photo-trigger{display:flex;align-items:center;gap:10px;background:var(--orange-light);border:1.5px dashed var(--orange);border-radius:8px;padding:12px 14px;cursor:pointer;transition:background 0.15s;}
 .photo-trigger:active{background:#ffe0cc;}
-.photo-trigger span{font-size:13px;color:var(--orange-dark);font-weight:500;}
+.photo-trigger span{font-size:13px;color:var(--brown);font-weight:600;}
 .photo-trigger .cam-icon{font-size:22px;}
 .photo-preview{position:relative;margin-top:8px;}
 .photo-preview img{width:100%;max-height:200px;object-fit:cover;border-radius:8px;border:1.5px solid var(--border);}
@@ -148,8 +163,8 @@ input[type="file"].photo-input{display:none;}
 
 /* AUDIT MASTER WORKSPACE */
 .audit-filters{display:flex;gap:8px;padding:12px 16px;overflow-x:auto;-webkit-overflow-scrolling:touch;}
-.filter-chip{white-space:nowrap;padding:7px 14px;border-radius:20px;border:1.5px solid var(--border);background:white;font-size:13px;cursor:pointer;color:var(--text);font-weight:500;}
-.filter-chip.active{background:var(--brown);color:white;border-color:var(--brown);}
+.filter-chip{white-space:nowrap;padding:7px 14px;border-radius:20px;border:1.5px solid var(--border);background:var(--surface);font-size:13px;cursor:pointer;color:var(--brown);font-weight:500;}
+.filter-chip.active{background:var(--brown);color:#fff;border-color:var(--brown);}
 .audit-list{padding:0 16px 24px;display:flex;flex-direction:column;gap:10px;}
 .audit-card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;}
 
@@ -168,6 +183,19 @@ input[type="file"].photo-input{display:none;}
 .cal-cell.explainable:active{background:var(--grey-light);opacity:0.7;}
 .cal-cell.has-logs{background:var(--orange-light);color:var(--orange-dark);font-weight:700;border:1px solid #ffc89a;}
 .cal-cell.selected-date{background:var(--brown) !important;color:white !important;border-color:var(--brown) !important;}
+/* (v2.0) The month grid is gone — only the last few days are ever openable,
+   so a plain list is smaller, needs no scrolling, and crosses month ends
+   without the gap the grid had (on 3 Sep it could only render 1-3 Sep, so
+   most of the supposedly-available week simply wasn't there). */
+.cal-list{display:flex;flex-direction:column;gap:4px;}
+.cal-day-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 12px;border:1.5px solid var(--border);border-radius:9px;background:var(--surface);cursor:pointer;font-size:14px;}
+.cal-day-row .cal-day-name{font-weight:600;color:var(--text);}
+.cal-day-row .cal-day-meta{font-size:11.5px;color:var(--text-muted);white-space:nowrap;}
+.cal-day-row.is-today{border-color:var(--orange);}
+.cal-day-row.no-logs{opacity:0.55;}
+.cal-day-row.selected-day{background:var(--brown);border-color:var(--brown);}
+.cal-day-row.selected-day .cal-day-name,.cal-day-row.selected-day .cal-day-meta{color:#fff;}
+.cal-day-row:active{background:var(--grey-light);}
 
 /* FLAG MODAL */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:flex-end;z-index:200;}
@@ -184,36 +212,43 @@ input[type="file"].photo-input{display:none;}
 .lightbox img{max-width:100%;max-height:90vh;border-radius:8px;}
 .lightbox-close{position:absolute;top:16px;right:16px;background:rgba(255,255,255,0.15);border:none;color:white;width:36px;height:36px;border-radius:50%;font-size:18px;cursor:pointer;}
 
-.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--brown);color:white;padding:10px 20px;border-radius:9px;font-size:13px;font-weight:500;z-index:300;opacity:0;transition:opacity 0.2s;pointer-events:none;white-space:nowrap;max-width:90vw;text-align:center;}
+.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--brown);color:#fff;padding:10px 20px;border-radius:9px;font-size:13px;font-weight:500;z-index:300;opacity:0;transition:opacity 0.2s;pointer-events:none;white-space:nowrap;max-width:90vw;text-align:center;}
 .toast.show{opacity:1;}
 
 @media(prefers-color-scheme:dark){
-  :root{--text:#f0ece8;--text-muted:#9e9890;--border:#3a3530;--grey-light:#1a1714;--grey:#3a3530;--surface:#24211e;}
-  .login-card,.modal,.submit-banner,.cal-box{background:#24211e;}
-  .field select,.field input,.modal textarea,.temp-input{background:#1a1714;color:#f0ece8;border-color:#3a3530;}
-  .filter-chip{background:#24211e;}
-  .photo-trigger{background:#2a1f14;border-color:#cc5a1a;}
+  /* (v2.0) Rebased on deep brown rather than neutral grey, so dark mode reads
+     as the same brand rather than a different app. Cream becomes the ink
+     instead of the ground; orange stays the accent. */
+  :root{
+    --text:#f2ece0; --text-muted:#b5a992; --border:#463a2e;
+    --cream:#211b15; --cream-deep:#2e261d; --grey-light:#1a1510; --grey:#463a2e;
+    --surface:#2b241c; --brown:#e8dfcc; --brown-light:#2e261d;
+  }
+  body{background:var(--cream);}
+  .header{background:#1a1510;color:var(--brown);border-bottom-color:#463a2e;}
+  .header-btn{background:#2b241c;border-color:#463a2e;color:var(--brown);}
+  #screen-login{background:var(--cream);}
+  .login-logo{color:var(--brown);}
+  .login-card,.modal,.submit-banner,.cal-box{background:#2b241c;}
+  .field select,.field input,.modal textarea,.temp-input{background:#1a1510;color:#f2ece0;border-color:#463a2e;}
+  .filter-chip{background:#2b241c;color:var(--brown);}
+  .filter-chip.active{background:var(--orange);border-color:var(--orange);color:#1a1510;}
+  .cal-day-row{background:#2b241c;}
+  .cal-day-row.selected-day{background:var(--orange);border-color:var(--orange);}
+  .cal-day-row.selected-day .cal-day-name,.cal-day-row.selected-day .cal-day-meta{color:#1a1510;}
+  /* Primary buttons invert: cream fill, dark ink — brown-on-dark would vanish. */
+  .btn-primary,.btn-brown{background:var(--orange);color:#1a1510;}
+  .btn-ghost{background:#2b241c;color:var(--brown);}
+  .toast{background:#e8dfcc;color:#1a1510;}
+  .photo-trigger{background:#33240f;border-color:var(--orange-dark);}
+  .task-card.completed{border-color:#2f5c42;}
+  .task-card.flagged-card{border-color:#7a3b34;}
 }
 
-/* ON-DEMAND REPORT (print only) */
-@media screen { #report-output{ display:none; } }
-@media print {
-  body > *:not(#report-output){ display:none !important; }
-  #report-output{ display:block !important; color:#000; font-family:-apple-system,'Segoe UI',sans-serif; }
-  #report-output h1{ font-size:18px; margin:0 0 2px; color:#000; }
-  #report-output .rpt-meta{ font-size:11px; color:#444; margin-bottom:12px; line-height:1.5; }
-  #report-output .rpt-date{ font-size:14px; font-weight:700; background:#eee; padding:4px 8px; margin:14px 0 6px; border-radius:4px; }
-  #report-output .rpt-store{ font-size:13px; font-weight:700; margin:8px 0 4px; }
-  #report-output .rpt-cl{ font-size:12px; font-weight:600; margin:6px 0 2px; }
-  #report-output table{ width:100%; border-collapse:collapse; font-size:11px; margin-bottom:6px; }
-  #report-output th{ text-align:left; border-bottom:1px solid #999; padding:3px 5px; font-size:10px; text-transform:uppercase; color:#555; }
-  #report-output td{ border-bottom:1px solid #ddd; padding:3px 5px; vertical-align:top; }
-  #report-output .miss,#report-output .late,#report-output .fail{ color:#b00; font-weight:700; }
-  #report-output .early{ color:#b35900; font-weight:700; }
-  #report-output .ok{ color:#060; }
-  #report-output .rpt-store,#report-output .rpt-cl,#report-output table{ break-inside:avoid; }
-  @page{ margin:14mm; }
-}
+/* (v2.0) The print-only #report-output styles were removed along with the
+   client-side report they served. Leaving them would have been actively
+   harmful: the rule `body > *:not(#report-output){display:none}` hid the
+   entire app when printing, for a target element that no longer exists. */
 </style>
 </head>
 <body>
@@ -222,7 +257,7 @@ input[type="file"].photo-input{display:none;}
   <div class="login-logo">
     <div class="logo-title">Bridge <span class="logo-orange">Baker</span></div>
     <div class="logo-sub">Daily Due Diligence</div>
-    <div id="login-version" style="margin-top:6px;font-size:11px;color:rgba(255,255,255,.55);"></div>
+    <div id="login-version" style="margin-top:6px;font-size:11px;color:var(--text-muted);opacity:.75;"></div>
   </div>
   <div class="login-card">
     <h2>Sign in</h2>
@@ -289,7 +324,7 @@ input[type="file"].photo-input{display:none;}
       <h1 id="matrix-title-label">Compliance Matrix</h1>
       <span id="matrix-date-badge" style="font-size:11px; opacity:0.85; background:rgba(255,255,255,0.18); padding:2px 8px; border-radius:10px; margin-top:2px; display:inline-block; cursor:pointer;" onclick="openCalendarPickerModal()">📅 Today</span>
     </div>
-    <button class="header-back" id="return-today-shortcut" style="display:none; font-size:12px; background:var(--orange); padding:4px 10px; border-radius:6px; color:white; font-weight:bold; margin-right:8px;" onclick="resetAuditDateToToday()">Today</button>
+    <button class="header-back" id="return-today-shortcut" style="display:none; font-size:12px; background:var(--brown); padding:4px 10px; border-radius:6px; color:#fff; font-weight:bold; margin-right:8px;" onclick="resetAuditDateToToday()">Today</button>
     <button class="header-btn" id="audit-report-btn" style="display:none;" onclick="openReportModal()">Report</button>
     <button class="header-btn" id="manager-signout-btn" style="display:none;" onclick="doLogout()">Sign out</button>
   </div>
@@ -304,7 +339,7 @@ input[type="file"].photo-input{display:none;}
       <span class="cal-title" id="cal-month-title">Calendar Selection</span>
       <button class="header-btn" style="padding:4px 10px;" onclick="closeCalendarPickerModal()">Close</button>
     </div>
-    <div class="cal-grid" id="cal-grid-target"></div>
+    <div class="cal-list" id="cal-grid-target"></div>
     <p id="cal-note" style="font-size:11.5px;line-height:1.45;color:var(--text-muted);margin-top:12px;border-top:1px solid var(--border);padding-top:10px;"></p>
   </div>
 </div>
@@ -393,8 +428,6 @@ input[type="file"].photo-input{display:none;}
   </div>
 </div>
 
-<div id="report-output"></div>
-
 <div class="toast" id="toast"></div>
 
 <script>
@@ -409,7 +442,7 @@ let taskStates = {};
 let flagTarget = null;
 let noteTarget = null;
 let baselineSig = {};            // per-task signature already persisted when a checklist opens
-const APP_VERSION = 'v1.18.0';      // bump on each deploy — shown in-app for a quick hygiene check
+const APP_VERSION = 'v2.0.0';      // bump on each deploy — shown in-app for a quick hygiene check
 let auditFilter = 'all';
 let auditDeptFilter = 'all';
 let auditSelectedDate = '';
@@ -768,7 +801,8 @@ function renderHome(){
   document.getElementById('stat-overdue').textContent = overdueTasks;
   document.getElementById('stat-flags').textContent   = flagTasks;
 
-  const menu=document.getElementById('checklist-menu'); menu.innerHTML='';
+  const menu=document.getElementById('checklist-menu');
+  const menuParts=[];   // (v2.0) accumulate, assign once — see renderTaskList
   CHECKLISTS.forEach(cl=>{
     const weekly = isWeeklyChecklist(cl);
     const vis = visibleTasks(cl, currentUser.store, depts).filter(t=>isDueBy(t, todayKey, weekStart));
@@ -796,7 +830,7 @@ function renderHome(){
     else if(due){st='● Due now';sc='due';}
     else{st=weekly?'This week':`Due ${cl.dueTimeLabel}`;sc='';}
 
-    menu.innerHTML+=`<div class="checklist-item${due||overdue?' has-orange':''}${predue?' predue':''}" onclick="openChecklist('${cl.id}')">
+    menuParts.push(`<div class="checklist-item${due||overdue?' has-orange':''}${predue?' predue':''}" onclick="openChecklist('${cl.id}')">
       <div class="checklist-icon" style="background:${cl.color}">${cl.icon}</div>
       <div class="checklist-info">
         <h3>${cl.label} <span style="font-size:10px; color:var(--text-muted); font-weight:normal;">(${[...new Set(vis.map(t=>String(t.department||'').trim().toUpperCase()).filter(Boolean))].join(' · ')})</span></h3>
@@ -805,8 +839,9 @@ function renderHome(){
       </div>
       <span class="checklist-status ${sc}">${st}</span>
       <span class="chevron">›</span>
-    </div>`;
+    </div>`);
   });
+  menu.innerHTML = menuParts.join('');
 }
 
 function openChecklist(id){
@@ -884,7 +919,16 @@ function mergeAndRender(id,todayKey){
 }
 
 function renderTaskList(){
-  const list=document.getElementById('task-list'); list.innerHTML='';
+  const list=document.getElementById('task-list');
+  // (v2.0) Build the whole list as one string and assign once. This used to
+  // do `list.innerHTML += ...` per task, which re-parses the entire
+  // accumulated markup on every iteration (O(n^2)) and re-creates each
+  // photo <img> — and renderTaskList() runs on EVERY tap (tick, temperature
+  // entry, photo). On a 30-task closing checklist that was a visible stutter
+  // per tap, entirely client-side and invisible in any server log.
+  // The generated markup is byte-for-byte identical to before; only the
+  // assignment strategy changed.
+  const parts=[];
 
   // v1.9: for weekly checklists, pending tasks float to the top and completed
   // ones drop below a divider — by Friday, staff no longer scroll past a
@@ -905,7 +949,7 @@ function renderTaskList(){
 
   tasksToRender.forEach((task, idx)=>{
     if (idx === dividerBeforeIdx) {
-      list.innerHTML += `<div style="margin:14px 0 2px;padding-top:10px;border-top:1px solid var(--border);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);">Completed this week</div>`;
+      parts.push(`<div style="margin:14px 0 2px;padding-top:10px;border-top:1px solid var(--border);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);">Completed this week</div>`);
     }
     const s=taskStates[task.name];
     let chkHtml='';
@@ -959,14 +1003,15 @@ function renderTaskList(){
     }
 
     const cardClass=s.status==='ok'?'completed':s.status==='flag'?'flagged-card':'';
-    list.innerHTML+=`<div class="task-card ${cardClass}">
+    parts.push(`<div class="task-card ${cardClass}">
       <div class="task-row" onclick="handleTaskClick('${task.name.replace(/'/g, "\\'")}')">
         ${chkHtml}
         <div class="task-body"><h4>${task.name}</h4>${noteHtml}</div>
       </div>
       ${tempHtml}${photoHtml}
-    </div>`;
+    </div>`);
   });
+  list.innerHTML = parts.join('');
   updateBanner();
 }
 
@@ -1121,7 +1166,10 @@ function updateBanner(){
   if(photosPending>0) msg+=` — ${photosPending} photo${photosPending>1?'s':''} still needed`;
   if(allDone) msg='All tasks complete — ready to submit';
   document.getElementById('submit-progress').textContent=msg;
-  const btn=document.getElementById('submit-btn'); btn.textContent=allDone?'Submit checklist ✓':'Save progress'; btn.style.background=allDone?'var(--ok)':'var(--orange)';
+  const btn=document.getElementById('submit-btn'); btn.textContent=allDone?'Submit checklist ✓':'Save progress';
+  // (v2.0) brown (not orange) when there is still work to save: an inline
+  // style here overrides .btn-primary, and orange+white is only ~2.8:1.
+  btn.style.background=allDone?'var(--ok)':'var(--brown)';
 }
 
 function submitChecklist(){
@@ -1324,7 +1372,7 @@ function setCalNote(msg, emphasis){
   el.style.color = emphasis ? 'var(--orange-dark)' : 'var(--text-muted)';
 }
 function calDefaultNote(){
-  setCalNote('Only the last ' + AUDIT_DAY_WINDOW + ' days can be opened here. For older dates, use <strong>Report</strong> — it\'s emailed to you.', false);
+  setCalNote('For anything older than this, use <strong>Report</strong> — it\'s emailed to you.', false);
 }
 // Tapped a date that can't be opened — say why, and leave the modal open so
 // another date can be picked straight away.
@@ -1340,52 +1388,50 @@ function explainCalendarDate(dateKey, reason){
 
 function openCalendarPickerModal() {
   const modal = document.getElementById('cal-modal');
-  const targetGrid = document.getElementById('cal-grid-target');
+  const target = document.getElementById('cal-grid-target');
   const title = document.getElementById('cal-month-title');
-
-  const now = new Date();
-  title.textContent = now.toLocaleString('en-GB', { month: 'long', year: 'numeric' }) + " Logs";
-  targetGrid.innerHTML = '';
+  title.textContent = 'Recent days';
   calDefaultNote();
 
-  const labels = ['Su','Mo','Tu','We','Th','Fr','Sa'];
-  labels.forEach(l => { targetGrid.innerHTML += `<div class="cal-day-lbl">${l}</div>`; });
-
-  const firstDayIndex = new Date(now.getFullYear(), now.getMonth(), 1).getDay();
-  const totalDaysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-
-  for (let i = 0; i < firstDayIndex; i++) { targetGrid.innerHTML += `<div></div>`; }
-
+  // (v2.0) A list of the openable days, newest first — replacing the month
+  // grid. The grid rendered only the CURRENT month, so in the first week of
+  // any month most of the 7-day window didn't exist on screen at all (on
+  // 3 Sep it showed 1-3 Sep only, with 27-31 Aug unreachable). A list has no
+  // month boundary to fall off, needs no scrolling, and makes the window
+  // self-evident, so nothing has to be greyed out to explain itself.
   const todayKey = toDateKey(new Date());
-  for (let day = 1; day <= totalDaysInMonth; day++) {
-    const curDate = new Date(now.getFullYear(), now.getMonth(), day);
-    const dateKeyStr = toDateKey(curDate);
-    const hasData = LOGGED_DATES.includes(dateKeyStr);
-    const isToday = dateKeyStr === todayKey;
-    const isSelected = dateKeyStr === auditSelectedDate;
-    const daysAgo = Math.round((new Date(todayKey + 'T00:00:00') - curDate) / 86400000);
-    const isFuture = daysAgo < 0;
-    const tooOld = daysAgo > AUDIT_DAY_WINDOW;
-
-    const openable = (hasData || isToday) && !tooOld;
-    // Future dates stay inert and silent — nothing to explain about a day
-    // that hasn't happened. Everything else is tappable, either to open or
-    // to say why it can't be.
-    let cellClass, clickAttr = '';
-    if (openable) {
-      cellClass = 'cal-cell has-logs';
-      clickAttr = `onclick="handleCalendarDateClick('${dateKeyStr}')"`;
-    } else if (isFuture) {
-      cellClass = 'cal-cell disabled';
-    } else {
-      cellClass = 'cal-cell explainable';
-      clickAttr = `onclick="explainCalendarDate('${dateKeyStr}','${tooOld ? 'old' : 'nodata'}')"`;
-    }
-    if (isSelected) cellClass += " selected-date";
-
-    targetGrid.innerHTML += `<div class="${cellClass}" ${clickAttr}>${day}</div>`;
+  const rows = [];
+  for (let back = 0; back <= AUDIT_DAY_WINDOW; back++) {
+    const key = addDaysKey(todayKey, -back);
+    const isToday = back === 0;
+    const hasData = LOGGED_DATES.includes(key);
+    const openable = hasData || isToday;
+    const label = isToday ? 'Today — ' + humanDayLabel(key) : humanDayLabel(key);
+    const meta = openable ? (hasData ? 'View' : 'No checks yet') : 'No checks logged';
+    let cls = 'cal-day-row';
+    if (isToday) cls += ' is-today';
+    if (!openable) cls += ' no-logs';
+    if (key === auditSelectedDate) cls += ' selected-day';
+    const click = openable
+      ? `onclick="handleCalendarDateClick('${key}')"`
+      : `onclick="explainCalendarDate('${key}','nodata')"`;
+    rows.push(`<div class="${cls}" ${click}><span class="cal-day-name">${label}</span><span class="cal-day-meta">${meta}</span></div>`);
   }
+  target.innerHTML = rows.join('');
   modal.style.display = 'flex';
+}
+
+// "Thu 18 Sep" — short, unambiguous, and no year cluttering a list that only
+// ever covers the last week.
+function humanDayLabel(dateKey){
+  const p = dateKey.split('-');
+  const d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+  // Explicit month list rather than toLocaleDateString: en-GB renders
+  // September as "Sept", which is inconsistent with formatToHumanDate's "Sep"
+  // used elsewhere in the app.
+  const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return days[d.getDay()] + ' ' + d.getDate() + ' ' + months[d.getMonth()];
 }
 
 function closeCalendarPickerModal() { document.getElementById('cal-modal').style.display = 'none'; }
@@ -1398,7 +1444,11 @@ function fetchAuditDay(dateKey, patient){
   renderAudit(); // paint immediately from whatever's cached
   const url = PRECONFIGURED_WEBHOOK || getWebhook();
   if(!url){ return; }
-  if(patient) showToast('📅 Loading ' + dateKey + '… older days can take a moment');
+  // (v2.0) Was: 'Loading 2026-09-18… older days can take a moment' — the raw
+  // key is unfriendly and the tail got cut off on a phone. The patience
+  // warning is also obsolete: every read has been bounded to the requested
+  // window since v1.15, so a day inside the last week is no slower than today.
+  if(patient) showToast('📅 Loading ' + humanDayLabel(dateKey));
   const cb = 'bb_audit_' + Date.now();
   const script = document.createElement('script');
   const timer = setTimeout(()=>{ cleanup(); showToast('⚠ Slow to load — check signal, then reopen the date'); renderAudit(); }, 25000);
@@ -1469,7 +1519,8 @@ function renderAudit(){
   `).join('');
 
   const targetStores = auditFilter === 'all' ? stores : [auditFilter];
-  const list = document.getElementById('audit-list'); list.innerHTML = '';
+  const list = document.getElementById('audit-list');
+  const auditParts = [];   // (v2.0) accumulate, assign once — see renderTaskList
 
   const deptScope = auditDeptFilter === 'all' ? ['ALL'] : [auditDeptFilter];
 
@@ -1544,13 +1595,13 @@ function renderAudit(){
 
     if (checklistsHtml !== '') {
       let storeHtml = `<div style="margin-top:16px; margin-bottom:8px;"><h2 style="font-size:16px; font-weight:700; color:var(--brown); padding:0 4px;">🏢 ${store}</h2></div>`;
-      list.innerHTML += storeHtml + checklistsHtml;
+      auditParts.push(storeHtml + checklistsHtml);
     }
   });
 
-  if (list.innerHTML === '') {
-    list.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-muted); font-weight:500;">ℹ️ No logs match the selected department filters.</div>';
-  }
+  list.innerHTML = auditParts.length
+    ? auditParts.join('')
+    : '<div style="text-align:center; padding:40px; color:var(--text-muted); font-weight:500;">ℹ️ No logs match the selected department filters.</div>';
 }
 
 function setAuditFilter(s){auditFilter=s;renderAudit();}
@@ -1593,14 +1644,12 @@ function homeNeedsWeekWindow(todayKey, weekStartKey){
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),5000);}
 
 /* ── ON-DEMAND MANAGER REPORT ────────────────────────────────────────────
-   Manager picks a date range, stores, check-type and detail level. We fetch
-   the whole range in one call (getRange), rebuild the same on-time/late/early
-   picture used elsewhere, render a print-styled report and hand it to the
-   browser's print dialog (Save as PDF / print / share). */
+   Manager picks a date range, stores and report type; the report is built
+   SERVER-SIDE and emailed. (v2.0: the old client-side print path — fetchRange,
+   buildReportModel, renderReportHtml, generateReport — has been deleted. It
+   was unreachable from the UI and its backing 'getRange' action read the whole
+   sheet unbounded, so it was a live hazard rather than a harmless leftover.) */
 const REPORT_STORES = ['124 WBR', '811 Fulham Rd', '101 Olympia'];
-let reportStores = new Set(REPORT_STORES);
-let reportCheckType = 'all';   // 'all' | 'temp'
-let reportDetail = 'summary';  // 'summary' | 'full'
 
 let reportMode = 'all';
 let reportStoreFilter = 'all';   // 'all' or a specific store name — applies to every mode
@@ -1673,164 +1722,14 @@ async function emailRangeReport(){
 }
 function closeReportModal(){ document.getElementById('report-modal').style.display = 'none'; }
 
-function renderReportChips(){
-  const allOn = reportStores.size === REPORT_STORES.length;
-  let sHtml = `<div class="filter-chip ${allOn?'active':''}" onclick="toggleReportStore('all')">All</div>`;
-  sHtml += REPORT_STORES.map(s => `<div class="filter-chip ${(!allOn && reportStores.has(s))?'active':''}" onclick="toggleReportStore('${s.replace(/'/g,"\\'")}')">${s}</div>`).join('');
-  document.getElementById('rpt-store-chips').innerHTML = sHtml;
 
-  document.getElementById('rpt-type-chips').innerHTML =
-    [['all','All checks'],['temp','Temperature only']]
-      .map(([v,l]) => `<div class="filter-chip ${reportCheckType===v?'active':''}" onclick="setReportType('${v}')">${l}</div>`).join('');
 
-  document.getElementById('rpt-detail-chips').innerHTML =
-    [['summary','Summary'],['full','Full record']]
-      .map(([v,l]) => `<div class="filter-chip ${reportDetail===v?'active':''}" onclick="setReportDetail('${v}')">${l}</div>`).join('');
-}
-function toggleReportStore(s){
-  if(s === 'all'){ reportStores = new Set(REPORT_STORES); }
-  else {
-    const allOn = reportStores.size === REPORT_STORES.length;
-    if(allOn){ reportStores = new Set([s]); }
-    else if(reportStores.has(s)){ reportStores.delete(s); if(reportStores.size===0) reportStores = new Set(REPORT_STORES); }
-    else { reportStores.add(s); }
-  }
-  renderReportChips();
-}
-function setReportType(v){ reportCheckType = v; renderReportChips(); }
-function setReportDetail(v){ reportDetail = v; renderReportChips(); }
-
-function fetchRange(from, to){
-  const url = PRECONFIGURED_WEBHOOK || getWebhook();
-  return new Promise((resolve) => {
-    if(!url){ resolve([]); return; }
-    const cb = 'bb_range_' + Date.now();
-    const script = document.createElement('script');
-    const timer = setTimeout(() => { cleanup(); resolve([]); }, 15000);
-    window[cb] = function(rows){ cleanup(); resolve(Array.isArray(rows) ? rows : []); };
-    function cleanup(){ clearTimeout(timer); delete window[cb]; if(script.parentNode) script.parentNode.removeChild(script); }
-    script.onerror = () => { cleanup(); resolve([]); };
-    script.src = url + '?action=getRange&from=' + from + '&to=' + to + '&callback=' + cb;
-    document.head.appendChild(script);
-  });
-}
-
-function datesBetween(from, to){
-  const out = []; let d = new Date(from + 'T00:00:00'); const end = new Date(to + 'T00:00:00');
-  while(d <= end){ out.push(toDateKey(d)); d.setDate(d.getDate() + 1); }
-  return out;
-}
-function minsToLabel(m){ const h = Math.floor(m/60), mm = m%60; return String(h).padStart(2,'0') + ':' + String(mm).padStart(2,'0'); }
 function escapeHtml(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 // Latest non-pending status per date|store|checklist|task wins (matches the app).
-function buildEntryLookup(records){
-  const map = {};
-  records.slice().sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp)).forEach(r => {
-    r.tasks.forEach(t => {
-      if(t.status === 'pending') return;
-      const key = r.date + '|' + r.store + '|' + r.checklistId + '|' + t.name;
-      map[key] = { status: t.status, note: t.note || '', temp: t.temp, signedBy: t.signedBy || r.staff, ts: r.timestamp };
-    });
-  });
-  return map;
-}
 
-function buildReportModel(records, opts){
-  const lookup = buildEntryLookup(records);
-  const out = [];
-  datesBetween(opts.from, opts.to).forEach(date => {
-    const storeBlocks = [];
-    opts.stores.forEach(store => {
-      const clBlocks = [];
-      CHECKLISTS.forEach(cl => {
-        let vis = visibleTasks(cl, store, ['ALL']);
-        if(opts.tempOnly) vis = vis.filter(t => t.type === 'temp');
-        if(vis.length === 0) return;
-        const rows = [];
-        vis.forEach(task => {
-          const hit = lookup[date + '|' + store + '|' + cl.id + '|' + task.name];
-          let row;
-          if(!hit){
-            row = { name: task.name, type: task.type, status: 'missed', timing: '', signedBy: '', time: '', temp: '', note: '', min: task.min, max: task.max, pass: null };
-          } else {
-            const timing = classifyTiming(hit.ts, cl.dueMinutes, cl.dueEndMinutes);
-            const time = hit.ts ? new Date(hit.ts).toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'}) : '';
-            let pass = null;
-            if(task.type === 'temp'){ const n = parseFloat(hit.temp); pass = (!isNaN(n) && n >= task.min && n <= task.max); }
-            row = { name: task.name, type: task.type, status: hit.status, timing, signedBy: hit.signedBy || '', time, temp: hit.temp, note: hit.note || '', min: task.min, max: task.max, pass };
-          }
-          if(opts.detail === 'summary'){
-            const isException = row.status === 'missed' || row.status === 'flag' || row.timing === 'late' || row.timing === 'early' || (row.type === 'temp' && row.pass === false);
-            if(!isException) return;
-          }
-          rows.push(row);
-        });
-        if(rows.length > 0) clBlocks.push({ id: cl.id, label: cl.label, icon: cl.icon, dueLabel: cl.dueTimeLabel, dueEndLabel: minsToLabel(cl.dueEndMinutes), rows });
-      });
-      if(clBlocks.length > 0) storeBlocks.push({ store, checklists: clBlocks });
-    });
-    if(storeBlocks.length > 0) out.push({ date, stores: storeBlocks });
-  });
-  return out;
-}
 
-function renderReportHtml(model, opts){
-  const now = new Date();
-  const storesLabel = opts.stores.length === REPORT_STORES.length ? 'All stores' : opts.stores.join(', ');
-  const typeLabel = opts.tempOnly ? 'Temperature checks only' : 'All checks';
-  const detailLabel = opts.detail === 'summary' ? 'Summary — exceptions only (missed, late, early, failed, flagged)' : 'Full record';
-  let html = `<h1>Bridge Baker — Compliance Report</h1>
-    <div class="rpt-meta">${formatToHumanDate(opts.from)} – ${formatToHumanDate(opts.to)} &middot; ${storesLabel} &middot; ${typeLabel} &middot; ${detailLabel}<br>Generated ${now.toLocaleString('en-GB')}</div>`;
 
-  if(model.length === 0){
-    html += `<p style="font-size:13px;">${opts.detail === 'summary' ? 'No missed, late, early, failed or flagged checks in this range. All clear.' : 'No records found for this range.'}</p>`;
-    return html;
-  }
-
-  model.forEach(day => {
-    html += `<div class="rpt-date">${formatToHumanDate(day.date)}</div>`;
-    day.stores.forEach(sb => {
-      html += `<div class="rpt-store">${escapeHtml(sb.store)}</div>`;
-      sb.checklists.forEach(cb => {
-        html += `<div class="rpt-cl">${cb.icon||''} ${escapeHtml(cb.label)} <span style="font-weight:400;color:#777;">(due ${cb.dueLabel}–${cb.dueEndLabel})</span></div>`;
-        html += `<table><thead><tr><th>Task</th><th>Result</th><th>Signed by</th><th>Time</th></tr></thead><tbody>`;
-        cb.rows.forEach(r => {
-          let result = '';
-          if(r.status === 'missed'){ result = `<span class="miss">✗ NOT COMPLETED</span>`; }
-          else if(r.status === 'flag'){ result = `<span class="late">! Flagged${r.note ? ': ' + escapeHtml(r.note) : ''}</span>`; }
-          else {
-            if(r.type === 'temp'){
-              result = `<span class="${r.pass?'ok':'fail'}">✓ ${r.temp!=='' ? escapeHtml(r.temp) + '°C ' : ''}${r.pass?'PASS':'FAIL'}</span> <span style="color:#777;">(range ${r.min}–${r.max}°C)</span>`;
-            } else {
-              result = `<span class="ok">✓ Done</span>`;
-            }
-            if(r.timing === 'late') result += ` <span class="late">· LATE</span>`;
-            else if(r.timing === 'early') result += ` <span class="early">· EARLY</span>`;
-          }
-          html += `<tr><td>${escapeHtml(r.name)}</td><td>${result}</td><td>${escapeHtml(r.signedBy||'—')}</td><td>${r.time||'—'}</td></tr>`;
-        });
-        html += `</tbody></table>`;
-      });
-    });
-  });
-  return html;
-}
-
-async function generateReport(){
-  const from = document.getElementById('rpt-from').value;
-  const to = document.getElementById('rpt-to').value;
-  if(!from || !to){ showToast('Pick both dates'); return; }
-  if(from > to){ showToast('“From” date is after “To” date'); return; }
-
-  const opts = { from, to, stores: [...reportStores], tempOnly: reportCheckType === 'temp', detail: reportDetail };
-  closeReportModal();
-  showToast('⏳ Building report…');
-  const records = await fetchRange(from, to);
-  const model = buildReportModel(records, opts);
-  document.getElementById('report-output').innerHTML = renderReportHtml(model, opts);
-  setTimeout(() => { window.print(); }, 250);
-}
 
 const PRECONFIGURED_WEBHOOK = 'https://script.google.com/macros/s/AKfycbzCNaostAl2gRJcVCNSNwi-92B46q5GW1SRwB5oC3Ge9H_tDE1tFl6m_36XBOAXgcW5/exec';
 
