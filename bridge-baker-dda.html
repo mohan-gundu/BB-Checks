@@ -419,12 +419,17 @@ input[type="file"].photo-input{display:none;}
      confirmation" flow. Stays up while waiting (no auto-hide), and once
      resolved requires an explicit Close tap rather than fading away on its
      own — so a manager who glances away mid-request can't miss the result. -->
-<div class="modal-overlay" id="report-status-modal" style="display:none;">
+<!-- (v2.1) One status modal shared by the report request AND the checklist
+     submit. Both had the same problem: a small toast that vanished while the
+     user was still waiting, leaving them unsure whether to tap again. It
+     blocks interaction while working, so a submit can't be double-tapped or
+     edited mid-save, and the result requires an explicit dismissal. -->
+<div class="modal-overlay" id="status-modal" style="display:none;">
   <div class="modal" style="text-align:center;">
-    <div id="report-status-icon" style="font-size:42px;line-height:1;margin-bottom:10px;">⏳</div>
-    <h3 id="report-status-title" style="font-size:19px;margin-bottom:8px;">Requesting report…</h3>
-    <p id="report-status-message" style="font-size:15px;line-height:1.5;color:var(--text-muted);">This can take up to 30 seconds — please keep this open.</p>
-    <button class="btn btn-primary" id="report-status-close-btn" style="display:none;margin-top:16px;" onclick="hideReportStatusModal()">Close</button>
+    <div id="status-modal-icon" style="font-size:42px;line-height:1;margin-bottom:10px;">⏳</div>
+    <h3 id="status-modal-title" style="font-size:19px;margin-bottom:8px;">Working…</h3>
+    <p id="status-modal-message" style="font-size:15px;line-height:1.5;color:var(--text-muted);">Please keep this open.</p>
+    <button class="btn btn-primary" id="status-modal-close-btn" style="display:none;margin-top:16px;" onclick="hideStatusModal()">Close</button>
   </div>
 </div>
 
@@ -434,6 +439,16 @@ input[type="file"].photo-input{display:none;}
 let CHECKLISTS = [];
 let STAFF_ROSTER = [];
 let LOGGED_DATES = [];
+// (v2.1) Load-state tracking. Both the day picker and the audit view used to
+// render immediately from whatever happened to be cached, with no way to tell
+// "nothing was logged" apart from "nothing has arrived yet". For the audit
+// view in particular that meant a past date briefly rendered as a full matrix
+// of "✗ Pending" — i.e. a false 'nobody did anything that day' reading, in an
+// app whose whole purpose is evidencing that they did.
+let loggedDatesReady = false;    // has the date list ever arrived?
+let loggedDatesInFlight = false; // avoid firing overlapping fetches
+let auditLoadingDate = '';       // date currently being fetched, '' when idle
+let auditFailedDate = '';        // date whose fetch failed/timed out
 
 let currentUser = {name:'',store:'',role:'',departments:[]};
 let currentChecklist = null;
@@ -442,7 +457,7 @@ let taskStates = {};
 let flagTarget = null;
 let noteTarget = null;
 let baselineSig = {};            // per-task signature already persisted when a checklist opens
-const APP_VERSION = 'v2.0.0';      // bump on each deploy — shown in-app for a quick hygiene check
+const APP_VERSION = 'v2.2.0';      // bump on each deploy — shown in-app for a quick hygiene check
 let auditFilter = 'all';
 let auditDeptFilter = 'all';
 let auditSelectedDate = '';
@@ -703,26 +718,32 @@ async function fetchSystemData() {
 // lazily — only when a manager is in the audit area. Kept out of login.
 function fetchLoggedDates(){
   const url=PRECONFIGURED_WEBHOOK||getWebhook(); if(!url) return;
+  if(loggedDatesInFlight) return;          // (v2.1) don't stack overlapping fetches
+  loggedDatesInFlight = true;
   const cb='bb_dates_'+Date.now();
   const script=document.createElement('script');
-  // (v1.17) 8s → 15s. The bounded getLoggedDates should now return in ~1–2s,
-  // but an Apps Script cold start can eat several seconds on its own, and a
-  // timeout here fails silently — LOGGED_DATES stays empty and the whole
-  // audit calendar greys out with no indication why. Cheap headroom.
-  const timer=setTimeout(()=>cleanup(),15000);
+  // (v2.1) 8s → 15s, matching the other reads. A silent timeout here is what
+  // left the picker looking empty with no explanation.
+  const timer=setTimeout(()=>{ cleanup(); repaintPickerIfOpen(); },15000);
   window[cb]=function(dates){
     cleanup();
     if(Array.isArray(dates)){
       LOGGED_DATES=dates;
+      loggedDatesReady = true;
       try{ localStorage.setItem('bb_logged_dates', JSON.stringify(dates)); }catch(e){}
-      const modal=document.getElementById('cal-modal');
-      if(modal && modal.style.display==='flex') openCalendarPickerModal();
     }
+    repaintPickerIfOpen();
   };
-  function cleanup(){ clearTimeout(timer); try{delete window[cb];}catch(e){} if(script.parentNode) script.parentNode.removeChild(script); }
-  script.onerror=()=>cleanup();
+  function cleanup(){ loggedDatesInFlight=false; clearTimeout(timer); try{delete window[cb];}catch(e){} if(script.parentNode) script.parentNode.removeChild(script); }
+  script.onerror=()=>{ cleanup(); repaintPickerIfOpen(); };
   script.src=url+'?action=getLoggedDates&callback='+cb;
   document.head.appendChild(script);
+}
+
+// Re-render the picker in place if it happens to be open when data lands.
+function repaintPickerIfOpen(){
+  const modal=document.getElementById('cal-modal');
+  if(modal && modal.style.display==='flex') openCalendarPickerModal();
 }
 
 function setHomeDeptFilter(dept) {
@@ -852,7 +873,7 @@ function openChecklist(id){
   // Weekly tasks appear only once their due day has arrived in the current week.
   currentVisibleTasks = visibleTasks(currentChecklist, currentUser.store, effectiveDepartments()).filter(t=>isDueBy(t, todayKey, weekStart));
   taskStates={};
-  currentVisibleTasks.forEach(t=>{taskStates[t.name]={status:'pending',note:'',temp:'',photo:null,hasPhoto:false,signedBy:null,time:null};});
+  currentVisibleTasks.forEach(t=>{taskStates[t.name]={status:'pending',note:'',temp:'',photo:null,hasPhoto:false,signedBy:null,time:null,signedAt:null};});
   document.getElementById('checklist-title').textContent=currentChecklist.icon+' '+currentChecklist.label;
   showScreen('screen-checklist');
   // Paint instantly from the copy already cached on this device…
@@ -884,7 +905,13 @@ function mergeAndRender(id,todayKey){
         if(firstId[t.name]!==undefined) return;   // earliest drives everything else
         firstId[t.name]=save.id;
       }
-      taskStates[t.name]={ status:t.status, note:t.note||'', temp:t.temp||'', photo:t.photo||null, hasPhoto:!!(t.photo||t.hasPhoto), signedBy:t.signedBy||save.staff, time: save.timestamp ? new Date(save.timestamp).toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'}) : '' };
+      // (v2.2) The displayed time comes from the task's own sign-off, falling
+      // back to the submission time only for pre-v2.2 records. Rebuilding it
+      // from save.timestamp unconditionally is what made a retried save
+      // re-stamp completed work with the retry time on screen as well as in
+      // the sheet.
+      const sAt = signedAtOf(t, save);
+      taskStates[t.name]={ status:t.status, note:t.note||'', temp:t.temp||'', photo:t.photo||null, hasPhoto:!!(t.photo||t.hasPhoto), signedBy:t.signedBy||save.staff, signedAt: t.signedAt||null, time: hhmmFromIso(sAt) };
     });
   });
   Object.keys(latestWkNote).forEach(nm=>{ if(taskStates[nm]) taskStates[nm].note=latestWkNote[nm]; });
@@ -1035,7 +1062,7 @@ function processTemperatureInputGuard(name, val, min, max, inputElement) {
 }
 
 function wipeTemperatureEntryDirectly(name) {
-  const s = taskStates[name]; s.status = 'pending'; s.temp = ''; s.note = ''; s.signedBy = null; s.time = null; s.photo = null;
+  const s = taskStates[name]; s.status = 'pending'; s.temp = ''; s.note = ''; s.signedBy = null; s.time = null; s.signedAt = null; s.photo = null;
   renderTaskList();
 }
 
@@ -1052,7 +1079,7 @@ function handleTaskClick(name){
     return;
   }
   if(s.status === 'pending'){
-    s.status = 'ok'; s.signedBy = currentUser.name; s.time = new Date().toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'});
+    s.status = 'ok'; s.signedBy = currentUser.name; s.signedAt = nowIso(); s.time = hhmmFromIso(s.signedAt);
     renderTaskList(); showToast('✓ Signed off');
   } else {
     // Already signed off (ok or flag). A sign-off is final — instead of forcing
@@ -1114,9 +1141,9 @@ function setTemp(name,val,min,max){
   if(!isNaN(n)){
     const ok=n>=min&&n<=max; taskStates[name].status=ok?'ok':'flag';
     taskStates[name].note=ok?'':`Temperature ${n}°C out of range (${min}–${max}°C)`;
-    taskStates[name].signedBy=currentUser.name; taskStates[name].time=new Date().toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'});
+    taskStates[name].signedBy=currentUser.name; taskStates[name].signedAt=nowIso(); taskStates[name].time=hhmmFromIso(taskStates[name].signedAt);
   } else {
-    taskStates[name].status='pending'; taskStates[name].signedBy=null; taskStates[name].time=null;
+    taskStates[name].status='pending'; taskStates[name].signedBy=null; taskStates[name].time=null; taskStates[name].signedAt=null;
   }
   renderTaskList();
 }
@@ -1180,7 +1207,9 @@ function submitChecklist(){
   // (ok / flag) are written to the sheet — pending rows are noise the reader
   // ignores anyway.
   const taskArr=currentVisibleTasks.map(t=>({
-    name:t.name, status:taskStates[t.name].status, note:taskStates[t.name].note, temp:taskStates[t.name].temp, photo:taskStates[t.name].photo||null, hasPhoto:!!(taskStates[t.name].photo||taskStates[t.name].hasPhoto), signedBy:taskStates[t.name].status!=='pending'?currentUser.name:null
+    name:t.name, status:taskStates[t.name].status, note:taskStates[t.name].note, temp:taskStates[t.name].temp, photo:taskStates[t.name].photo||null, hasPhoto:!!(taskStates[t.name].photo||taskStates[t.name].hasPhoto), signedBy:taskStates[t.name].status!=='pending'?currentUser.name:null,
+    // (v2.2) when this task was ticked on the device → sheet column K
+    signedAt:taskStates[t.name].status!=='pending'?(taskStates[t.name].signedAt||null):null
   }));
   const actioned=taskArr.filter(t=>{
     const sig=t.status+'|'+(t.temp||'')+'|'+(t.note||'');
@@ -1188,13 +1217,27 @@ function submitChecklist(){
   });
   if(actioned.length===0){
     const anyDone=taskArr.some(t=>t.status!=='pending');
-    if(anyDone){ showToast('✓ Already saved — no new changes'); showScreen('screen-home'); }
+    // (v2.1) This path also ends by navigating home, so it uses the same
+    // modal as a real save — a toast that flashes while the screen changes
+    // is exactly what left people unsure whether anything had happened.
+    if(anyDone){ showStatusModalThenHome('Already saved', 'Nothing new to submit — everything here is on record.'); }
     else { showToast('Nothing to submit yet — tick at least one task'); }
     return;
   }
   const done=taskArr.filter(t=>t.status!=='pending').length; const total=taskArr.length; const allDone=done===total; const hasFlag=taskArr.some(t=>t.status==='flag');
 
-  const rec={ id:Date.now(), timestamp:new Date().toISOString(), date:toDateKey(new Date()), store:currentUser.store, staff:currentUser.name, checklistId:currentChecklist.id, checklistName:currentChecklist.label, partial:!allDone, hasFlag, tasks:taskArr };
+  // (v2.2) If an earlier attempt for this checklist is still unconfirmed,
+  // reuse ITS timestamp and date rather than minting new ones. Previously
+  // every tap of Submit stamped the record with the current time, so a
+  // checklist finished before 08:00 and successfully retried at 14:37 was
+  // filed at 14:37 — and, if the retry crossed midnight, under the wrong
+  // date entirely. Reusing the original also makes the retry idempotent
+  // against confirmWriteLanded, which matches on exact timestamp.
+  const priorAttempt = pendingConfirm[currentChecklist.id];
+  const rec={ id: priorAttempt ? priorAttempt.id : Date.now(),
+    timestamp: priorAttempt ? priorAttempt.timestamp : new Date().toISOString(),
+    date: priorAttempt ? priorAttempt.date : toDateKey(new Date()),
+    store:currentUser.store, staff:currentUser.name, checklistId:currentChecklist.id, checklistName:currentChecklist.label, partial:!allDone, hasFlag, tasks:taskArr };
 
   submitToSheetsConfirmed(rec, actioned);
 }
@@ -1214,25 +1257,33 @@ async function submitToSheetsConfirmed(rec, actioned){
   const prevBtn=btn?btn.textContent:'';
   if(btn){ btn.disabled=true; btn.style.opacity='0.7'; btn.textContent='Saving…'; }
   if(banner) banner.textContent='Saving… please wait';
+  // (v2.1) A blocking modal, not a toast. The old faded-button state was too
+  // subtle to read at a glance on a phone, so staff couldn't tell whether a
+  // tap had registered and tapped again. This also makes it impossible to
+  // keep editing the list mid-save.
+  showStatusModal('loading', 'Saving…', 'Please keep this open until it confirms.');
 
   const url=PRECONFIGURED_WEBHOOK||getWebhook();
   let landed=false;
+  let ackFast=false;
+
+  function finishUI(){ if(btn){ btn.disabled=false; btn.style.opacity='1'; btn.textContent=prevBtn||'Submit checklist ✓'; } }
 
   if(url){
     // Step 1: did an earlier unconfirmed attempt actually land?
     const prev=pendingConfirm[rec.checklistId];
     if(prev){
       if(banner) banner.textContent='Checking previous save…';
+      showStatusModal('loading', 'Checking previous save…', 'Making sure your last submit went through.');
       const prevLanded=await confirmWriteLanded(url, prev, 8000);
       if(prevLanded){
         delete pendingConfirm[rec.checklistId];
         saveRecord(prev);
         const covered=actioned.every(a=>prev.tasks.some(p=>p.name===a.name&&p.status===a.status&&String(p.temp||'')===String(a.temp||'')&&String(p.note||'')===String(a.note||'')));
         if(covered){
-          if(btn){ btn.disabled=false; btn.style.opacity='1'; btn.textContent=prevBtn||'Submit checklist ✓'; }
-          console.log('[BB] submit confirm: earlier attempt already landed, nothing new to post');
-          showToast('✓ Saved — your earlier submit had gone through');
-          showScreen('screen-home');
+          finishUI();
+          console.log('[BB] submit: earlier attempt already landed, nothing new to post');
+          showStatusModalThenHome('Saved', 'Your earlier submit had already gone through.');
           return;
         }
         // The earlier attempt landed but this submit contains something new —
@@ -1243,47 +1294,73 @@ async function submitToSheetsConfirmed(rec, actioned){
 
     // Step 2: post.
     if(banner) banner.textContent='Saving… please wait';
+    showStatusModal('loading', 'Saving…', 'Please keep this open until it confirms.');
     const payload={ timestamp:rec.timestamp, date:rec.date, store:rec.store, staff:rec.staff, checklistName:rec.checklistName,
-      tasks:actioned.map(t=>({ name:t.name, status:t.status, note:t.note, temp:t.temp, hasPhoto:t.hasPhoto, photoData:t.photo })) };
-    try{ await fetch(url,{ method:'POST', mode:'no-cors', body:JSON.stringify(payload) }); }catch(err){ /* response is opaque; the read-back below is the real check */ }
+      tasks:actioned.map(t=>({ name:t.name, status:t.status, note:t.note, temp:t.temp, hasPhoto:t.hasPhoto, photoData:t.photo, signedAt:t.signedAt||null })) };
 
-    // Step 3: confirm, patiently. Photos slow the server (each is uploaded to
-    // Drive), so the first wait scales with how many were sent.
-    const photoCount=actioned.filter(t=>t.photo).length;
-    // (v1.15) Rebalanced. Previously the FIRST wait scaled hard with photo
-    // count — 1500+2500*4 = 11.5s before even checking — so a 4-photo closing
-    // checklist sat there for ~14s minimum even when the write had actually
-    // landed in 2s. Now we check early and back off gradually: a fast save is
-    // confirmed in ~2s, while total patience across all attempts is still
-    // ~30s for the genuinely slow photo-heavy cases. Photo count still nudges
-    // the first wait, just far more gently.
-    const delays=[1500+500*Math.min(photoCount,4), 2500, 4000, 6000, 8000, 10000];
-    let attempts=0;
-    for(let i=0;i<delays.length && !landed;i++){
-      await sleepMs(delays[i]);
-      attempts++;
-      landed=await confirmWriteLanded(url, rec, 8000);
-      if(!landed && banner) banner.textContent='Saving… still confirming ('+(i+1)+' of '+delays.length+')';
+    // (v2.1) Try a READABLE post first.
+    //   Why this is worth attempting: with mode:'no-cors' the response is
+    //   opaque — the browser refuses to let us read status or body — so the
+    //   app had no way to know a write succeeded and had to read the whole
+    //   day back to look for its own rows. That read-back cost 3.5-8s on
+    //   every single save, and by v2.0 it was the slowest part of saving.
+    //   Why it can work: this is a "simple" cross-origin request (plain
+    //   string body ⇒ Content-Type text/plain, no custom headers), so the
+    //   browser sends no preflight, and the googleusercontent.com response
+    //   Apps Script redirects to does allow cross-origin reads. If the ack
+    //   comes back, it is a STRONGER guarantee than reading the day back,
+    //   because setValues() has already completed before doPost returns.
+    //   CRITICAL: if this throws, the request was still SENT and very likely
+    //   written — the browser only blocked our sight of the reply. So the
+    //   fallback must NEVER re-post; it drops through to confirming exactly
+    //   as before. Re-posting here is what used to create duplicate rows.
+    try{
+      const res = await fetch(url, { method:'POST', body:JSON.stringify(payload) });
+      if(res && res.ok){
+        const txt = await res.text();
+        let ack=null; try{ ack=JSON.parse(txt); }catch(_){ }
+        if(ack && ack.status==='ok'){ landed=true; ackFast=true; }
+        else if(!ack && /^\s*ok\s*$/i.test(txt)){ landed=true; ackFast=true; }   // pre-v2.1 backend
+      }
+    }catch(err){
+      // CORS blocked the reply, or the network failed. Either way: do not
+      // re-send. Fall through to the confirmation path below.
+      console.log('[BB] readable POST unavailable, falling back to confirmation:', err && err.message);
     }
-    // (v1.14) Browser console only — this is client-side timing data the
-    // server never sees, so it can't go in the Apps Script Executions log.
-    // Open devtools (F12) after a slow save to check whether it took several
-    // attempts (points at the confirmation polling itself) or just one
-    // (points at the initial POST/photo-upload being the slow part).
-    console.log('[BB] submit confirm: photos=' + photoCount + ' attempts=' + attempts + ' landed=' + landed);
+
+    // Step 3: only if the ack could not be read — confirm by reading back.
+    if(!landed){
+      const photoCount=actioned.filter(t=>t.photo).length;
+      // (v2.1) First wait raised 1500 → 2500. At 1.5s the write is often not
+      // visible yet, so the eager check burned a ~2s round trip and then
+      // waited 2.5s more — it usually made saves slower, not faster.
+      const delays=[2500+500*Math.min(photoCount,4), 3000, 4000, 6000, 8000, 10000];
+      let attempts=0;
+      for(let i=0;i<delays.length && !landed;i++){
+        await sleepMs(delays[i]);
+        attempts++;
+        landed=await confirmWriteLanded(url, rec, 8000);
+        if(!landed){
+          if(banner) banner.textContent='Saving… still confirming ('+(i+1)+' of '+delays.length+')';
+          showStatusModal('loading', 'Still saving…', 'Checking that it went through ('+(i+1)+' of '+delays.length+').');
+        }
+      }
+      console.log('[BB] submit fallback: photos=' + photoCount + ' attempts=' + attempts + ' landed=' + landed);
+    } else {
+      console.log('[BB] submit: acknowledged directly by the server, no read-back needed');
+    }
   }
 
-  if(btn){ btn.disabled=false; btn.style.opacity='1'; btn.textContent=prevBtn||'Submit checklist ✓'; }
+  finishUI();
 
   if(landed){
     delete pendingConfirm[rec.checklistId];
     saveRecord(rec);
-    showToast('✓ Saved');
-    showScreen('screen-home');
+    showStatusModalThenHome('Saved', ackFast ? 'Confirmed by the server.' : 'Confirmed.');
   } else {
     pendingConfirm[rec.checklistId]=rec;
     if(banner) banner.textContent='⚠ Couldn’t confirm the save — tap Submit once to re-check. Don’t re-tick anything.';
-    showToast('⚠ Couldn’t confirm — tap Submit once to re-check');
+    showStatusModal('error', 'Couldn’t confirm the save', 'Your ticks are safe. Close this and tap Submit once to re-check — don’t re-tick anything.');
     // We stay on the checklist; ticks are preserved. The next tap re-checks
     // this attempt before it would ever post again.
   }
@@ -1349,7 +1426,7 @@ function confirmFlag(){
   const s=taskStates[flagTarget];
   s.status='flag';
   s.note=appendNoteText(s.note, add || 'Issue flagged');   // keep any earlier notes
-  s.signedBy=currentUser.name; s.time=new Date().toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'});
+  s.signedBy=currentUser.name; s.signedAt=nowIso(); s.time=hhmmFromIso(s.signedAt);
   hideModal(); renderTaskList(); showToast('⚠ Issue flagged');
 }
 
@@ -1391,15 +1468,37 @@ function openCalendarPickerModal() {
   const target = document.getElementById('cal-grid-target');
   const title = document.getElementById('cal-month-title');
   title.textContent = 'Recent days';
+
+  // (v2.1) Refresh on open rather than relying only on the fetch fired at
+  // sign-in, so the list can't be stale — and, until it arrives, say so.
+  // Previously an unarrived list rendered every day as "No checks logged",
+  // untappable, which reads as "there is no data" rather than "still
+  // loading" — hence people tapping the badge again and again.
+  if(!loggedDatesReady || !loggedDatesInFlight) fetchLoggedDates();
+
+  const todayKey = toDateKey(new Date());
+
+  if(!loggedDatesReady){
+    const skeleton = [];
+    for (let back = 0; back <= AUDIT_DAY_WINDOW; back++) {
+      const key = addDaysKey(todayKey, -back);
+      const label = back === 0 ? 'Today — ' + humanDayLabel(key) : humanDayLabel(key);
+      skeleton.push(`<div class="cal-day-row no-logs" style="cursor:default;"><span class="cal-day-name">${label}</span><span class="cal-day-meta">Loading…</span></div>`);
+    }
+    target.innerHTML = skeleton.join('');
+    setCalNote('Loading recent days… <span style="opacity:.7">this usually takes a couple of seconds.</span>', false);
+    modal.style.display = 'flex';
+    return;
+  }
+
   calDefaultNote();
 
-  // (v2.0) A list of the openable days, newest first — replacing the month
-  // grid. The grid rendered only the CURRENT month, so in the first week of
-  // any month most of the 7-day window didn't exist on screen at all (on
-  // 3 Sep it showed 1-3 Sep only, with 27-31 Aug unreachable). A list has no
-  // month boundary to fall off, needs no scrolling, and makes the window
+  // A list of the openable days, newest first — replacing the month grid. The
+  // grid rendered only the CURRENT month, so in the first week of any month
+  // most of the 7-day window didn't exist on screen at all (on 3 Sep it
+  // showed 1-3 Sep only, with 27-31 Aug unreachable). A list has no month
+  // boundary to fall off, needs no scrolling, and makes the window
   // self-evident, so nothing has to be greyed out to explain itself.
-  const todayKey = toDateKey(new Date());
   const rows = [];
   for (let back = 0; back <= AUDIT_DAY_WINDOW; back++) {
     const key = addDaysKey(todayKey, -back);
@@ -1441,17 +1540,31 @@ function closeCalendarPickerModal() { document.getElementById('cal-modal').style
 // further up the log, so we show a patience note and a generous timeout.
 function fetchAuditDay(dateKey, patient){
   auditSelectedDate = dateKey;
-  renderAudit(); // paint immediately from whatever's cached
+  auditFailedDate = '';
   const url = PRECONFIGURED_WEBHOOK || getWebhook();
+
+  // (v2.1) Only paint immediately when we actually HAVE something for this
+  // date. Previously renderAudit() ran unconditionally, so picking a past day
+  // rendered every task as "✗ Pending" for several seconds before the data
+  // arrived — a full matrix asserting that nobody did anything that day. In a
+  // due-diligence app that transient false negative is the single worst thing
+  // to show: glance at it, or screenshot it, and you draw exactly the wrong
+  // conclusion. Today stays instant (its cache is warm and accurate); a date
+  // with nothing cached shows an honest "loading" panel instead.
+  const haveCached = getRecords().some(r => r.date === dateKey);
+  auditLoadingDate = (haveCached || !url) ? '' : dateKey;
+  renderAudit();
+
   if(!url){ return; }
-  // (v2.0) Was: 'Loading 2026-09-18… older days can take a moment' — the raw
-  // key is unfriendly and the tail got cut off on a phone. The patience
-  // warning is also obsolete: every read has been bounded to the requested
-  // window since v1.15, so a day inside the last week is no slower than today.
-  if(patient) showToast('📅 Loading ' + humanDayLabel(dateKey));
+  if(patient && haveCached) showToast('📅 Loading ' + humanDayLabel(dateKey));
   const cb = 'bb_audit_' + Date.now();
   const script = document.createElement('script');
-  const timer = setTimeout(()=>{ cleanup(); showToast('⚠ Slow to load — check signal, then reopen the date'); renderAudit(); }, 25000);
+  const timer = setTimeout(()=>{
+    cleanup();
+    // Don't fall back to an empty matrix — say plainly that it didn't load.
+    auditFailedDate = dateKey;
+    renderAudit();
+  }, 25000);
   window[cb] = function(remoteRows){
     cleanup();
     if(Array.isArray(remoteRows) && remoteRows.length > 0){
@@ -1462,8 +1575,8 @@ function fetchAuditDay(dateKey, patient){
     }
     renderAudit();
   };
-  function cleanup(){ clearTimeout(timer); try{delete window[cb];}catch(e){} if(script.parentNode) script.parentNode.removeChild(script); }
-  script.onerror = ()=>{ cleanup(); renderAudit(); };
+  function cleanup(){ auditLoadingDate=''; clearTimeout(timer); try{delete window[cb];}catch(e){} if(script.parentNode) script.parentNode.removeChild(script); }
+  script.onerror = ()=>{ cleanup(); auditFailedDate = dateKey; renderAudit(); };
   script.src = url + '?store=&date=' + dateKey + '&callback=' + cb;
   document.head.appendChild(script);
 }
@@ -1505,6 +1618,29 @@ function renderAudit(){
   document.getElementById('matrix-date-badge').textContent = isToday ? "📅 Today" : `📅 ${formatToHumanDate(auditSelectedDate)}`;
   document.getElementById('return-today-shortcut').style.display = isToday ? 'none' : 'block';
 
+  // (v2.1) Loading / failed states take over the list entirely, rather than
+  // letting an empty matrix imply non-compliance for a day we simply haven't
+  // fetched yet.
+  const listEl = document.getElementById('audit-list');
+  if(auditLoadingDate === auditSelectedDate){
+    document.getElementById('audit-filters').innerHTML = '';
+    document.getElementById('audit-dept-filters').innerHTML = '';
+    listEl.innerHTML = '<div style="text-align:center;padding:44px 20px;color:var(--text-muted);">'
+      + '<div style="font-size:32px;line-height:1;margin-bottom:10px;">⏳</div>'
+      + '<div style="font-weight:700;color:var(--brown);font-size:15px;">Loading ' + formatToHumanDate(auditSelectedDate) + '…</div>'
+      + '<div style="font-size:13px;margin-top:6px;">Fetching that day\'s checks — this is not the day\'s result yet.</div></div>';
+    return;
+  }
+  if(auditFailedDate === auditSelectedDate){
+    document.getElementById('audit-filters').innerHTML = '';
+    document.getElementById('audit-dept-filters').innerHTML = '';
+    listEl.innerHTML = '<div style="text-align:center;padding:44px 20px;color:var(--text-muted);">'
+      + '<div style="font-size:32px;line-height:1;margin-bottom:10px;">⚠️</div>'
+      + '<div style="font-weight:700;color:var(--brown);font-size:15px;">Couldn\'t load ' + formatToHumanDate(auditSelectedDate) + '</div>'
+      + '<div style="font-size:13px;margin-top:6px;">Check your signal and pick the date again. This is <strong>not</strong> a record of what was done that day.</div></div>';
+    return;
+  }
+
   const filtersDiv = document.getElementById('audit-filters');
   filtersDiv.innerHTML = ['all', ...stores].map(s => `
     <div class="filter-chip ${auditFilter===s?'active':''}" onclick="setAuditFilter('${s}')">${s==='all'?'All Stores':s}</div>
@@ -1539,11 +1675,15 @@ function renderAudit(){
       clSaves.slice().reverse().forEach(save => {   // oldest-first: the first sign-off sets timing
         save.tasks.forEach(t => {
           if (taskMap[t.name] && t.status !== 'pending') {  // only count tasks visible under the current store/dept scope
-            let timePart = save.timestamp ? new Date(save.timestamp).toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'}) : '';
+            // (v2.2) Judge and display from the task's own sign-off time where
+            // it exists — a submission retried hours later was showing, and
+            // flagging, on-time work as LATE.
+            const sAt = signedAtOf(t, save);
+            let timePart = hhmmFromIso(sAt);
             // Keep the timing from the FIRST completion so a later note/re-save
             // can't shift on-time → late.
             let priorSet = (taskMap[t.name].status !== 'pending');
-            let timing = priorSet ? taskMap[t.name].timing : classifyTiming(save.timestamp, cl.dueMinutes, cl.dueEndMinutes);
+            let timing = priorSet ? taskMap[t.name].timing : classifyTiming(sAt, cl.dueMinutes, cl.dueEndMinutes);
             if (t.status === 'ok') {
               taskMap[t.name] = { status: 'ok', details: `✓ Done by ${save.staff} ${timePart ? `at ${timePart}` : ''} ${t.temp ? `(${t.temp}°C)` : ''}${t.note ? ` — 📝 ${t.note}` : ''}`, photo: t.photo || taskMap[t.name].photo || null, timing: timing };
             } else if (t.status === 'flag') {
@@ -1641,6 +1781,21 @@ function homeNeedsWeekWindow(todayKey, weekStartKey){
       .some(t => isWeeklyTask(t) && isDueBy(t, todayKey, weekStartKey))
   );
 }
+/* (v2.2) The moment a task is ticked, kept alongside its display label.
+   Until now only the HH:mm string existed, and it was rebuilt from the
+   SUBMISSION time whenever a record round-tripped — so a save retried hours
+   later rewrote the sign-off time to the retry. signedAt is captured on the
+   device at the moment of the tick and is what column K stores. */
+function nowIso(){ return new Date().toISOString(); }
+function hhmmFromIso(iso){
+  if(!iso) return '';
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? '' : d.toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'});
+}
+/* Prefer the task's own sign-off time; fall back to the submission time for
+   records written before v2.2, which carry no signedAt. */
+function signedAtOf(task, save){ return (task && task.signedAt) || (save && save.timestamp) || null; }
+
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),5000);}
 
 /* ── ON-DEMAND MANAGER REPORT ────────────────────────────────────────────
@@ -1685,14 +1840,22 @@ function setReportStoreFilter(v){ reportStoreFilter = v; renderReportStoreChips(
 // Persistent report status modal — replaces a flashing toast for this flow.
 // state: 'loading' | 'success' | 'error'. Loading has no Close button (can't
 // be dismissed early); success/error show one and require an explicit tap.
-function showReportStatusModal(state, title, message){
-  document.getElementById('report-status-icon').textContent = state === 'loading' ? '⏳' : (state === 'success' ? '✅' : '⚠️');
-  document.getElementById('report-status-title').textContent = title;
-  document.getElementById('report-status-message').textContent = message || '';
-  document.getElementById('report-status-close-btn').style.display = (state === 'loading') ? 'none' : 'block';
-  document.getElementById('report-status-modal').style.display = 'flex';
+// state: 'loading' | 'success' | 'error'. Loading shows no Close button, so
+// it can't be dismissed while work is in flight; success/error require a tap.
+function showStatusModal(state, title, message){
+  document.getElementById('status-modal-icon').textContent = state === 'loading' ? '⏳' : (state === 'success' ? '✅' : '⚠️');
+  document.getElementById('status-modal-title').textContent = title;
+  document.getElementById('status-modal-message').textContent = message || '';
+  document.getElementById('status-modal-close-btn').style.display = (state === 'loading') ? 'none' : 'block';
+  document.getElementById('status-modal').style.display = 'flex';
 }
-function hideReportStatusModal(){ document.getElementById('report-status-modal').style.display = 'none'; }
+function hideStatusModal(){ document.getElementById('status-modal').style.display = 'none'; }
+// Success states that should send the user home once dismissed.
+function showStatusModalThenHome(title, message){
+  showStatusModal('success', title, message);
+  const btn = document.getElementById('status-modal-close-btn');
+  btn.onclick = function(){ btn.onclick = hideStatusModal; hideStatusModal(); showScreen('screen-home'); };
+}
 
 // Range reports are built SERVER-SIDE and emailed to the manager's own address
 // (resolved from the Staff sheet — no recipient is entered on the device).
@@ -1703,18 +1866,18 @@ async function emailRangeReport(){
   const url = PRECONFIGURED_WEBHOOK || getWebhook();
   if(!url){ showToast('No connection configured'); return; }
   closeReportModal();
-  showReportStatusModal('loading', 'Requesting report…', 'This can take up to 30 seconds — please keep this open.');
+  showStatusModal('loading', 'Requesting report…', 'This can take up to 30 seconds — please keep this open.');
   const cb = 'bb_rpt_' + Date.now();
   const script = document.createElement('script');
-  const timer = setTimeout(()=>{ cleanup(); showReportStatusModal('error', 'Request timed out', 'Check your signal and try again.'); }, 30000);
+  const timer = setTimeout(()=>{ cleanup(); showStatusModal('error', 'Request timed out', 'Check your signal and try again.'); }, 30000);
   window[cb] = function(res){
     cleanup();
-    if(res && res.status === 'ok'){ showReportStatusModal('success', 'Report sent', 'Check your email — it\'s on its way.'); }
-    else if(res && res.status === 'no-email'){ showReportStatusModal('error', 'No report email set', 'Add one for your profile in the Staff sheet.'); }
-    else { showReportStatusModal('error', 'Could not send report', (res && res.message) || 'Please try again.'); }
+    if(res && res.status === 'ok'){ showStatusModal('success', 'Report sent', 'Check your email — it\'s on its way.'); }
+    else if(res && res.status === 'no-email'){ showStatusModal('error', 'No report email set', 'Add one for your profile in the Staff sheet.'); }
+    else { showStatusModal('error', 'Could not send report', (res && res.message) || 'Please try again.'); }
   };
   function cleanup(){ clearTimeout(timer); try{delete window[cb];}catch(e){} if(script.parentNode) script.parentNode.removeChild(script); }
-  script.onerror = ()=>{ cleanup(); showReportStatusModal('error', 'Could not reach the report service', 'Check your connection and try again.'); };
+  script.onerror = ()=>{ cleanup(); showStatusModal('error', 'Could not reach the report service', 'Check your connection and try again.'); };
   const mgr = encodeURIComponent(currentUser && currentUser.name ? currentUser.name : '');
   const storeParam = encodeURIComponent(reportStoreFilter === 'all' ? '' : reportStoreFilter);
   script.src = url + '?action=emailReport&from=' + from + '&to=' + to + '&mode=' + reportMode + '&store=' + storeParam + '&manager=' + mgr + '&callback=' + cb;
