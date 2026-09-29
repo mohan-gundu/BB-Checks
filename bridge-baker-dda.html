@@ -457,7 +457,7 @@ let taskStates = {};
 let flagTarget = null;
 let noteTarget = null;
 let baselineSig = {};            // per-task signature already persisted when a checklist opens
-const APP_VERSION = 'v2.2.0';      // bump on each deploy — shown in-app for a quick hygiene check
+const APP_VERSION = 'v2.3.0';      // bump on each deploy — shown in-app for a quick hygiene check
 let auditFilter = 'all';
 let auditDeptFilter = 'all';
 let auditSelectedDate = '';
@@ -741,9 +741,17 @@ function fetchLoggedDates(){
 }
 
 // Re-render the picker in place if it happens to be open when data lands.
+// (v2.3) Re-render ONLY. This used to call openCalendarPickerModal(), which
+// itself kicks off a fetch — and since fetchLoggedDates' callback calls this,
+// every response immediately triggered another request:
+//   open picker -> fetch -> response -> repaint -> fetch -> response -> ...
+// an endless loop for as long as the picker stayed open. It saturated Apps
+// Script's concurrent-execution limit, so the manager's day read queued
+// behind it and timed out. That is the "nothing is loading" / "it did load
+// later" / "went into this loop again" behaviour reported on 29 Sep.
 function repaintPickerIfOpen(){
   const modal=document.getElementById('cal-modal');
-  if(modal && modal.style.display==='flex') openCalendarPickerModal();
+  if(modal && modal.style.display==='flex') renderCalendarPicker();
 }
 
 function setHomeDeptFilter(dept) {
@@ -1463,18 +1471,23 @@ function explainCalendarDate(dateKey, reason){
   else if(reason==='nodata') setCalNote('No checks were logged on <strong>' + formatToHumanDate(dateKey) + '</strong>.', true);
 }
 
+// Opens the picker. Kicks off AT MOST ONE refresh, then renders. Rendering
+// itself never fetches — see repaintPickerIfOpen above for why that matters.
 function openCalendarPickerModal() {
+  document.getElementById('cal-modal').style.display = 'flex';
+  // (v2.1) Refresh on open rather than relying only on the fetch fired at
+  // sign-in, so the list can't be stale. fetchLoggedDates has its own
+  // in-flight guard, so a second open while one is running is a no-op.
+  fetchLoggedDates();
+  renderCalendarPicker();
+}
+
+// Pure render — no network, safe to call from a fetch callback.
+function renderCalendarPicker() {
   const modal = document.getElementById('cal-modal');
   const target = document.getElementById('cal-grid-target');
   const title = document.getElementById('cal-month-title');
   title.textContent = 'Recent days';
-
-  // (v2.1) Refresh on open rather than relying only on the fetch fired at
-  // sign-in, so the list can't be stale — and, until it arrives, say so.
-  // Previously an unarrived list rendered every day as "No checks logged",
-  // untappable, which reads as "there is no data" rather than "still
-  // loading" — hence people tapping the badge again and again.
-  if(!loggedDatesReady || !loggedDatesInFlight) fetchLoggedDates();
 
   const todayKey = toDateKey(new Date());
 
@@ -1487,7 +1500,6 @@ function openCalendarPickerModal() {
     }
     target.innerHTML = skeleton.join('');
     setCalNote('Loading recent days… <span style="opacity:.7">this usually takes a couple of seconds.</span>', false);
-    modal.style.display = 'flex';
     return;
   }
 
@@ -1517,7 +1529,6 @@ function openCalendarPickerModal() {
     rows.push(`<div class="${cls}" ${click}><span class="cal-day-name">${label}</span><span class="cal-day-meta">${meta}</span></div>`);
   }
   target.innerHTML = rows.join('');
-  modal.style.display = 'flex';
 }
 
 // "Thu 18 Sep" — short, unambiguous, and no year cluttering a list that only
@@ -1567,6 +1578,14 @@ function fetchAuditDay(dateKey, patient){
   }, 25000);
   window[cb] = function(remoteRows){
     cleanup();
+    // (v2.3) A non-array reply means the server returned an error object, not
+    // a day's records. Treating it as "no records" would paint an empty
+    // matrix — the false "nobody did anything that day" this whole loading
+    // state exists to prevent. Say it couldn't load instead.
+    if(remoteRows && !Array.isArray(remoteRows)){
+      console.log('[BB] audit read error:', remoteRows.message || remoteRows);
+      auditFailedDate = dateKey; renderAudit(); return;
+    }
     if(Array.isArray(remoteRows) && remoteRows.length > 0){
       const local = getRecords(); const localIds = new Set(local.map(r=>String(r.id)));
       remoteRows.forEach(r=>{ if(!localIds.has(String(r.id))) local.push(r); });
