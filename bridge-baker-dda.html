@@ -449,6 +449,7 @@ let loggedDatesReady = false;    // has the date list ever arrived?
 let loggedDatesInFlight = false; // avoid firing overlapping fetches
 let auditLoadingDate = '';       // date currently being fetched, '' when idle
 let auditFailedDate = '';        // date whose fetch failed/timed out
+let auditFailedMessage = '';     // (v2.4) the server's own words, when it gave any
 
 let currentUser = {name:'',store:'',role:'',departments:[]};
 let currentChecklist = null;
@@ -457,7 +458,7 @@ let taskStates = {};
 let flagTarget = null;
 let noteTarget = null;
 let baselineSig = {};            // per-task signature already persisted when a checklist opens
-const APP_VERSION = 'v2.3.0';      // bump on each deploy — shown in-app for a quick hygiene check
+const APP_VERSION = 'v2.5.0';      // bump on each deploy — shown in-app for a quick hygiene check
 let auditFilter = 'all';
 let auditDeptFilter = 'all';
 let auditSelectedDate = '';
@@ -724,7 +725,7 @@ function fetchLoggedDates(){
   const script=document.createElement('script');
   // (v2.1) 8s → 15s, matching the other reads. A silent timeout here is what
   // left the picker looking empty with no explanation.
-  const timer=setTimeout(()=>{ cleanup(); repaintPickerIfOpen(); },15000);
+  const timer=setTimeout(()=>{ cleanup(); repaintPickerIfOpen(); },45000);   // (v2.5) 15s → 45s; measured ~25s on 30 Sep
   window[cb]=function(dates){
     cleanup();
     if(Array.isArray(dates)){
@@ -1283,7 +1284,7 @@ async function submitToSheetsConfirmed(rec, actioned){
     if(prev){
       if(banner) banner.textContent='Checking previous save…';
       showStatusModal('loading', 'Checking previous save…', 'Making sure your last submit went through.');
-      const prevLanded=await confirmWriteLanded(url, prev, 8000);
+      const prevLanded=await confirmWriteLanded(url, prev, 25000);
       if(prevLanded){
         delete pendingConfirm[rec.checklistId];
         saveRecord(prev);
@@ -1347,7 +1348,7 @@ async function submitToSheetsConfirmed(rec, actioned){
       for(let i=0;i<delays.length && !landed;i++){
         await sleepMs(delays[i]);
         attempts++;
-        landed=await confirmWriteLanded(url, rec, 8000);
+        landed=await confirmWriteLanded(url, rec, 25000);
         if(!landed){
           if(banner) banner.textContent='Saving… still confirming ('+(i+1)+' of '+delays.length+')';
           showStatusModal('loading', 'Still saving…', 'Checking that it went through ('+(i+1)+' of '+delays.length+').');
@@ -1413,7 +1414,7 @@ async function syncFromSheets(store,dateKey,fromKey){
   const url=PRECONFIGURED_WEBHOOK||getWebhook();if(!url)return;
   return new Promise((resolve)=>{
     const callbackName='bb_sync_'+Date.now(); const src=url+'?store='+encodeURIComponent(store)+'&date='+dateKey+(fromKey?('&from='+fromKey):'')+'&callback='+callbackName; const script=document.createElement('script');
-    const timer=setTimeout(()=>{ cleanup();resolve(); },5000);
+    const timer=setTimeout(()=>{ cleanup();resolve(); },30000);   // (v2.5) 5s → 30s; this refresh runs in the background and never blocks the screen
     window[callbackName]=function(remote){
       cleanup(); if(!Array.isArray(remote)||remote.length===0){resolve();return;}
       const local=getRecords(); const localIds=new Set(local.map(r=>String(r.id))); let added=0;
@@ -1551,7 +1552,7 @@ function closeCalendarPickerModal() { document.getElementById('cal-modal').style
 // further up the log, so we show a patience note and a generous timeout.
 function fetchAuditDay(dateKey, patient){
   auditSelectedDate = dateKey;
-  auditFailedDate = '';
+  auditFailedDate = ''; auditFailedMessage = '';
   const url = PRECONFIGURED_WEBHOOK || getWebhook();
 
   // (v2.1) Only paint immediately when we actually HAVE something for this
@@ -1570,12 +1571,18 @@ function fetchAuditDay(dateKey, patient){
   if(patient && haveCached) showToast('📅 Loading ' + humanDayLabel(dateKey));
   const cb = 'bb_audit_' + Date.now();
   const script = document.createElement('script');
+  // (v2.5) 25s → 90s. Measured against the live endpoint on 30 Sep, a
+  // manager day read took 50-90s, so 25s could never succeed — the screen
+  // gave up before the server had a chance to answer. This is INTERIM: once
+  // convertPhotoFormulasToUrlsOnce() has run and PHOTO_FORMULAS_BACKFILLED
+  // is set, reads should return in a couple of seconds and this ceiling
+  // should never be approached.
   const timer = setTimeout(()=>{
     cleanup();
     // Don't fall back to an empty matrix — say plainly that it didn't load.
     auditFailedDate = dateKey;
     renderAudit();
-  }, 25000);
+  }, 90000);
   window[cb] = function(remoteRows){
     cleanup();
     // (v2.3) A non-array reply means the server returned an error object, not
@@ -1583,7 +1590,11 @@ function fetchAuditDay(dateKey, patient){
     // matrix — the false "nobody did anything that day" this whole loading
     // state exists to prevent. Say it couldn't load instead.
     if(remoteRows && !Array.isArray(remoteRows)){
-      console.log('[BB] audit read error:', remoteRows.message || remoteRows);
+      // (v2.4) Show the server's actual message on screen. Previously this
+      // only reached the browser console, which is not reachable on a phone —
+      // so a real backend error looked identical to a lost signal.
+      auditFailedMessage = String(remoteRows.message || '').slice(0, 300);
+      console.log('[BB] audit read error:', auditFailedMessage || remoteRows);
       auditFailedDate = dateKey; renderAudit(); return;
     }
     if(Array.isArray(remoteRows) && remoteRows.length > 0){
@@ -1647,7 +1658,7 @@ function renderAudit(){
     listEl.innerHTML = '<div style="text-align:center;padding:44px 20px;color:var(--text-muted);">'
       + '<div style="font-size:32px;line-height:1;margin-bottom:10px;">⏳</div>'
       + '<div style="font-weight:700;color:var(--brown);font-size:15px;">Loading ' + formatToHumanDate(auditSelectedDate) + '…</div>'
-      + '<div style="font-size:13px;margin-top:6px;">Fetching that day\'s checks — this is not the day\'s result yet.</div></div>';
+      + '<div style="font-size:13px;margin-top:6px;">Fetching that day\'s checks — this is not the day\'s result yet.<br><span style="opacity:.75;">Older days can take up to a minute at the moment.</span></div></div>';
     return;
   }
   if(auditFailedDate === auditSelectedDate){
@@ -1656,7 +1667,10 @@ function renderAudit(){
     listEl.innerHTML = '<div style="text-align:center;padding:44px 20px;color:var(--text-muted);">'
       + '<div style="font-size:32px;line-height:1;margin-bottom:10px;">⚠️</div>'
       + '<div style="font-weight:700;color:var(--brown);font-size:15px;">Couldn\'t load ' + formatToHumanDate(auditSelectedDate) + '</div>'
-      + '<div style="font-size:13px;margin-top:6px;">Check your signal and pick the date again. This is <strong>not</strong> a record of what was done that day.</div></div>';
+      + '<div style="font-size:13px;margin-top:6px;">' + (auditFailedMessage
+          ? 'The server reported: <strong>' + escapeHtml(auditFailedMessage) + '</strong>'
+          : 'Check your signal and pick the date again.')
+      + ' This is <strong>not</strong> a record of what was done that day.</div></div>';
     return;
   }
 
